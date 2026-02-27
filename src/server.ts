@@ -1,0 +1,27 @@
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import { config } from './config/index.js';
+import { healthRouter, authRouter } from './routes/index.js';
+
+const app = express();
+
+app.use(helmet());
+app.use(cors({ origin: config.corsOrigin, credentials: true }));
+app.use(express.json());
+
+app.use(healthRouter);
+app.use(authRouter);
+
+app.listen(config.port, () => {
+  console.log(`
+  ╔══════════════════════════════════════════════╗
+  ║  StudentContext AI API                       ║
+  ║  Port: ${config.port}                                ║
+  ║  Env:  ${config.nodeEnv.padEnd(37)}║
+  ║  CORS: ${config.corsOrigin.padEnd(37)}║
+  ╚══════════════════════════════════════════════╝
+  `);
+});
+
+export default app;

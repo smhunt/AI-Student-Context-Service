@@ -1,0 +1,24 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: studentcontext-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: studentcontext
+      POSTGRES_USER: sc_dev
+      POSTGRES_PASSWORD: dev_password
+    ports:
+      - "5438:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sc_dev -d studentcontext"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    labels:
+      com.ecoworks.project: "studentcontext-ai"
+      com.ecoworks.managed-by: "claude-code"
+
+volumes:
+  pgdata:

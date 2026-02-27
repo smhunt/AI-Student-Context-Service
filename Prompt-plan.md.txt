@@ -1,0 +1,1050 @@
+I don’t have file creation tools available in this session, so I’m going to produce the full technical specification here as a comprehensive artifact you can copy straight into your project. This is going to be thorough — the kind of document you’d hand to Claude Code with “build this.”
+
+StudentContext — Technical Specification v1.0
+Product: StudentContext AI
+Company: EcoWorks Web Architecture Inc.
+Author: Sean Hunt
+Date: February 2026
+
+1. Overview
+StudentContext is a middleware SaaS that transforms any school-board-approved LLM chatbot into a personalized learning companion by maintaining a vectorized knowledge base of each student’s complete digital academic history. It provides role-based contextual augmentation for students (self-service learning) and staff (classroom intelligence, report writing, guidance).
+Target customer: Ontario school boards, starting with Thames Valley DSB.
+Pricing: $1/student/month (10 months), $2/staff/month (12 months).
+Tech stack: TypeScript, Node.js, PostgreSQL + pgvector, React, Claude API (swappable).
+
+2. System Architecture
+
+┌──────────────────────────────────────────────────────────┐
+│                    CLIENT LAYER                          │
+│                                                          │
+│  ┌─────────────┐  ┌──────────────┐  ┌───────────────┐   │
+│  │ Student Chat │  │ Staff Portal │  │ Parent Portal │   │
+│  │   (React)    │  │   (React)    │  │   (React)     │   │
+│  └──────┬──────┘  └──────┬───────┘  └───────┬───────┘   │
+└─────────┼────────────────┼───────────────────┼───────────┘
+          │                │                   │
+          ▼                ▼                   ▼
+┌──────────────────────────────────────────────────────────┐
+│                    API GATEWAY                           │
+│              (Express + tRPC or REST)                    │
+│                                                          │
+│  /api/chat      - context-augmented chat                 │
+│  /api/auth      - SSO/OAuth flows                        │
+│  /api/consent   - parental consent management            │
+│  /api/admin     - board/school admin                     │
+│  /api/sync      - data source webhooks                   │
+│  /api/audit     - audit log queries                      │
+└──────────┬───────────────────────────────────────────────┘
+           │
+           ▼
+┌──────────────────────────────────────────────────────────┐
+│                  SERVICE LAYER                           │
+│                                                          │
+│  ┌─────────────────┐  ┌──────────────────────────────┐   │
+│  │ Context Engine   │  │ Ingestion Service            │   │
+│  │ - retrieve()     │  │ - Google Classroom sync      │   │
+│  │ - augment()      │  │ - SIS (Trillium) sync       │   │
+│  │ - rank()         │  │ - Assessment data sync       │   │
+│  └────────┬────────┘  │ - Chunker + Embedder         │   │
+│           │           └──────────────┬───────────────┘   │
+│  ┌────────▼────────┐                 │                   │
+│  │ LLM Adapter     │  ┌──────────────▼───────────────┐   │
+│  │ - Claude        │  │ Permission Service           │   │
+│  │ - OpenAI        │  │ - role-based access          │   │
+│  │ - Gemini        │  │ - consent verification       │   │
+│  │ - Copilot       │  │ - data scope filtering       │   │
+│  └─────────────────┘  └──────────────────────────────┘   │
+└──────────────────────────┬───────────────────────────────┘
+                           │
+                           ▼
+┌──────────────────────────────────────────────────────────┐
+│                  DATA LAYER                              │
+│              PostgreSQL + pgvector                        │
+│                                                          │
+│  ┌──────────┐ ┌───────────┐ ┌─────────┐ ┌────────────┐  │
+│  │ users    │ │ documents │ │embeddings│ │ audit_log  │  │
+│  │ students │ │ chunks    │ │ (vector) │ │ consent    │  │
+│  │ staff    │ │ sources   │ │          │ │ sessions   │  │
+│  └──────────┘ └───────────┘ └─────────┘ └────────────┘  │
+└──────────────────────────────────────────────────────────┘
+
+
+3. Database Schema
+3.1 Core Identity Tables
+
+-- Extension
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ============================================
+-- MULTI-TENANT: BOARDS AND SCHOOLS
+-- ============================================
+
+CREATE TABLE boards (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,                          -- 'Thames Valley District School Board'
+    slug TEXT UNIQUE NOT NULL,                   -- 'tvdsb'
+    province TEXT NOT NULL DEFAULT 'ON',
+    config JSONB NOT NULL DEFAULT '{}',          -- board-specific settings
+    llm_provider TEXT NOT NULL DEFAULT 'claude', -- default LLM for this board
+    llm_config JSONB NOT NULL DEFAULT '{}',      -- API keys, model preferences
+    active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE schools (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    board_id UUID NOT NULL REFERENCES boards(id),
+    name TEXT NOT NULL,                          -- 'Medway High School'
+    school_code TEXT NOT NULL,                   -- board's internal code
+    grades INT[] NOT NULL DEFAULT '{}',          -- {9,10,11,12}
+    config JSONB NOT NULL DEFAULT '{}',
+    active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(board_id, school_code)
+);
+
+-- ============================================
+-- USERS: STUDENTS, STAFF, PARENTS
+-- ============================================
+
+CREATE TYPE user_role AS ENUM (
+    'student',
+    'teacher',
+    'educational_assistant',
+    'guidance_counsellor',
+    'vice_principal',
+    'principal',
+    'board_admin',
+    'parent',
+    'supply_teacher'
+);
+
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    board_id UUID NOT NULL REFERENCES boards(id),
+    external_id TEXT,                            -- ID from SIS (Trillium student #)
+    email TEXT,
+    name_first TEXT NOT NULL,
+    name_last TEXT NOT NULL,
+    role user_role NOT NULL,
+    active BOOLEAN NOT NULL DEFAULT true,
+    metadata JSONB NOT NULL DEFAULT '{}',        -- grade, homeroom, department, etc.
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(board_id, external_id)
+);
+
+CREATE INDEX idx_users_board_role ON users(board_id, role);
+CREATE INDEX idx_users_email ON users(email);
+
+-- Students belong to schools (can transfer)
+CREATE TABLE student_enrollments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    student_id UUID NOT NULL REFERENCES users(id),
+    school_id UUID NOT NULL REFERENCES schools(id),
+    grade INT NOT NULL,
+    academic_year TEXT NOT NULL,                  -- '2025-2026'
+    status TEXT NOT NULL DEFAULT 'active',        -- active, transferred, graduated
+    start_date DATE NOT NULL,
+    end_date DATE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_enrollments_student ON student_enrollments(student_id);
+CREATE INDEX idx_enrollments_school_year ON student_enrollments(school_id, academic_year);
+
+-- Staff assignments to schools/classes
+CREATE TABLE staff_assignments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    staff_id UUID NOT NULL REFERENCES users(id),
+    school_id UUID NOT NULL REFERENCES schools(id),
+    academic_year TEXT NOT NULL,
+    department TEXT,                              -- 'Mathematics', 'Guidance'
+    role_scope TEXT NOT NULL DEFAULT 'teacher',   -- teacher, department_head, admin
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ============================================
+-- COURSES AND CLASS RELATIONSHIPS
+-- ============================================
+
+CREATE TABLE courses (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    school_id UUID NOT NULL REFERENCES schools(id),
+    external_id TEXT,                            -- Google Classroom ID or SIS course code
+    name TEXT NOT NULL,                          -- 'MPM2D - Principles of Mathematics'
+    course_code TEXT,                            -- 'MPM2D'
+    grade INT,
+    subject TEXT,                                -- 'Mathematics'
+    academic_year TEXT NOT NULL,
+    semester TEXT,                                -- 'S1', 'S2', 'FY'
+    source TEXT NOT NULL,                        -- 'google_classroom', 'trillium'
+    metadata JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE course_memberships (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    course_id UUID NOT NULL REFERENCES courses(id),
+    user_id UUID NOT NULL REFERENCES users(id),
+    role TEXT NOT NULL,                          -- 'student', 'teacher'
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(course_id, user_id)
+);
+
+CREATE INDEX idx_course_members_user ON course_memberships(user_id);
+CREATE INDEX idx_course_members_course ON course_memberships(course_id);
+
+
+3.2 Document & Vector Store
+
+-- ============================================
+-- DOCUMENTS: Raw ingested content
+-- ============================================
+
+CREATE TYPE document_source AS ENUM (
+    'google_classroom_assignment',
+    'google_classroom_submission',
+    'google_classroom_grade',
+    'google_classroom_comment',
+    'sis_report_card',
+    'sis_transcript',
+    'sis_attendance',
+    'sis_iep',
+    'assessment_eqao',
+    'assessment_board',
+    'library_record',
+    'teacher_note',
+    'guidance_note'
+);
+
+CREATE TYPE sensitivity_level AS ENUM (
+    'standard',        -- normal academic records
+    'sensitive',       -- IEP, behavioral, medical
+    'restricted'       -- psych-ed assessments, CAS involvement
+);
+
+CREATE TABLE documents (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    student_id UUID NOT NULL REFERENCES users(id),
+    board_id UUID NOT NULL REFERENCES boards(id),
+    source document_source NOT NULL,
+    source_id TEXT,                               -- external ID from source system
+    title TEXT,
+    content TEXT NOT NULL,                        -- raw text content
+    content_date DATE,                           -- when the content is FROM (not ingested)
+    academic_year TEXT,
+    course_id UUID REFERENCES courses(id),
+    sensitivity sensitivity_level NOT NULL DEFAULT 'standard',
+    metadata JSONB NOT NULL DEFAULT '{}',        -- grades, scores, teacher, etc.
+    hash TEXT NOT NULL,                          -- SHA-256 of content for dedup
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_documents_student ON documents(student_id);
+CREATE INDEX idx_documents_source ON documents(source);
+CREATE INDEX idx_documents_student_year ON documents(student_id, academic_year);
+CREATE INDEX idx_documents_hash ON documents(hash);
+
+-- ============================================
+-- CHUNKS: Documents split for embedding
+-- ============================================
+
+CREATE TABLE chunks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    student_id UUID NOT NULL REFERENCES users(id),
+    board_id UUID NOT NULL REFERENCES boards(id),
+    content TEXT NOT NULL,
+    chunk_index INT NOT NULL,                    -- order within document
+    token_count INT NOT NULL,
+    sensitivity sensitivity_level NOT NULL DEFAULT 'standard',
+    metadata JSONB NOT NULL DEFAULT '{}',        -- inherited + chunk-specific
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_chunks_student ON chunks(student_id);
+CREATE INDEX idx_chunks_document ON chunks(document_id);
+
+-- ============================================
+-- EMBEDDINGS: Vector representations
+-- ============================================
+
+CREATE TABLE embeddings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    chunk_id UUID NOT NULL REFERENCES chunks(id) ON DELETE CASCADE,
+    student_id UUID NOT NULL REFERENCES users(id),
+    board_id UUID NOT NULL REFERENCES boards(id),
+    embedding vector(1536) NOT NULL,             -- dimension matches model (adjust as needed)
+    model TEXT NOT NULL,                          -- 'text-embedding-3-small'
+    sensitivity sensitivity_level NOT NULL DEFAULT 'standard',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- HNSW index for fast similarity search, scoped per student
+CREATE INDEX idx_embeddings_vector ON embeddings
+    USING hnsw (embedding vector_cosine_ops)
+    WITH (m = 16, ef_construction = 64);
+
+CREATE INDEX idx_embeddings_student ON embeddings(student_id);
+CREATE INDEX idx_embeddings_board ON embeddings(board_id);
+
+
+3.3 Consent & Privacy
+
+-- ============================================
+-- CONSENT MANAGEMENT
+-- ============================================
+
+CREATE TYPE consent_status AS ENUM (
+    'pending',
+    'granted',
+    'denied',
+    'revoked'
+);
+
+CREATE TABLE consent_records (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    student_id UUID NOT NULL REFERENCES users(id),
+    parent_id UUID REFERENCES users(id),         -- parent who granted/denied
+    board_id UUID NOT NULL REFERENCES boards(id),
+    consent_type TEXT NOT NULL,                   -- 'ai_context', 'data_sharing', 'iep_inclusion'
+    status consent_status NOT NULL DEFAULT 'pending',
+    data_sources TEXT[] NOT NULL DEFAULT '{}',    -- which sources parent consents to
+    granted_at TIMESTAMPTZ,
+    revoked_at TIMESTAMPTZ,
+    ip_address INET,
+    user_agent TEXT,
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_consent_student ON consent_records(student_id);
+CREATE INDEX idx_consent_status ON consent_records(student_id, consent_type, status);
+
+-- ============================================
+-- AUDIT LOG: Every context retrieval is logged
+-- ============================================
+
+CREATE TABLE audit_log (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    board_id UUID NOT NULL REFERENCES boards(id),
+    actor_id UUID NOT NULL REFERENCES users(id),  -- who made the request
+    action TEXT NOT NULL,                          -- 'context_retrieval', 'chat_query', 'data_export'
+    target_student_id UUID REFERENCES users(id),  -- whose data was accessed
+    details JSONB NOT NULL DEFAULT '{}',          -- query text, chunks retrieved, etc.
+    ip_address INET,
+    session_id UUID,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_audit_actor ON audit_log(actor_id);
+CREATE INDEX idx_audit_target ON audit_log(target_student_id);
+CREATE INDEX idx_audit_time ON audit_log(created_at);
+
+-- Partition audit_log by month for performance at scale
+-- (implement partitioning when approaching board-wide deployment)
+
+
+3.4 Chat Sessions
+
+-- ============================================
+-- CHAT SESSIONS AND MESSAGES
+-- ============================================
+
+CREATE TABLE chat_sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    board_id UUID NOT NULL REFERENCES boards(id),
+    mode TEXT NOT NULL,                           -- 'student_self', 'staff_classroom', 'staff_guidance'
+    target_student_id UUID REFERENCES users(id), -- for staff mode: which student's context
+    target_course_id UUID REFERENCES courses(id),-- optional course scope
+    llm_provider TEXT NOT NULL,
+    started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ended_at TIMESTAMPTZ,
+    message_count INT NOT NULL DEFAULT 0,
+    metadata JSONB NOT NULL DEFAULT '{}'
+);
+
+CREATE TABLE chat_messages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id UUID NOT NULL REFERENCES chat_sessions(id),
+    role TEXT NOT NULL,                           -- 'user', 'assistant', 'system'
+    content TEXT NOT NULL,
+    chunks_used UUID[] DEFAULT '{}',             -- which chunks were injected as context
+    token_count_input INT,
+    token_count_output INT,
+    latency_ms INT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_messages_session ON chat_messages(session_id);
+
+
+4. Permission Model
+This is the core of what makes the product trustworthy. Every context retrieval passes through the permission service.
+4.1 Access Rules
+
+// src/services/permissions.ts
+
+interface ContextScope {
+  studentIds: string[];        // which students' data can be accessed
+  sensitivityMax: SensitivityLevel; // highest sensitivity level allowed
+  dataSources: DocumentSource[];    // which data sources are included
+  academicYears?: string[];         // time scope (optional)
+  courseIds?: string[];              // course scope (optional)
+}
+
+// Permission rules by role
+const PERMISSION_RULES: Record<UserRole, (user: User) => ContextScope> = {
+
+  // Students see ONLY their own data, standard sensitivity
+  student: (user) => ({
+    studentIds: [user.id],
+    sensitivityMax: 'standard',
+    dataSources: [
+      'google_classroom_assignment',
+      'google_classroom_submission',
+      'google_classroom_grade',
+      'sis_report_card',
+      'sis_transcript',
+      'assessment_eqao',
+      'assessment_board',
+    ],
+  }),
+
+  // Teachers see their current students, standard + sensitive for IEP awareness
+  teacher: (user) => ({
+    studentIds: getStudentIdsForTeacher(user.id),
+    sensitivityMax: 'sensitive',
+    dataSources: ALL_ACADEMIC_SOURCES,
+    academicYears: [currentAcademicYear(), previousAcademicYear()],
+    courseIds: getCourseIdsForTeacher(user.id),
+  }),
+
+  // EAs see assigned students, including sensitive
+  educational_assistant: (user) => ({
+    studentIds: getAssignedStudentIds(user.id),
+    sensitivityMax: 'sensitive',
+    dataSources: ALL_ACADEMIC_SOURCES,
+  }),
+
+  // Guidance sees their caseload, all sensitivity levels
+  guidance_counsellor: (user) => ({
+    studentIds: getCaseloadStudentIds(user.id),
+    sensitivityMax: 'restricted',
+    dataSources: ALL_SOURCES,
+  }),
+
+  // VP/Principal see all students in their school
+  vice_principal: (user) => ({
+    studentIds: getSchoolStudentIds(user.schoolId),
+    sensitivityMax: 'restricted',
+    dataSources: ALL_SOURCES,
+  }),
+
+  principal: (user) => ({
+    studentIds: getSchoolStudentIds(user.schoolId),
+    sensitivityMax: 'restricted',
+    dataSources: ALL_SOURCES,
+  }),
+
+  // Supply teachers see same as teacher but ONLY for today's assigned classes
+  supply_teacher: (user) => ({
+    studentIds: getTodaysClassStudentIds(user.id),
+    sensitivityMax: 'standard',  // no sensitive data for supply
+    dataSources: BASIC_ACADEMIC_SOURCES,
+    academicYears: [currentAcademicYear()],
+  }),
+
+  // Parents see ONLY their own children, standard only
+  parent: (user) => ({
+    studentIds: getChildrenIds(user.id),
+    sensitivityMax: 'standard',
+    dataSources: PARENT_VISIBLE_SOURCES,
+  }),
+
+  // Board admin sees aggregate only, no individual student context
+  board_admin: (user) => ({
+    studentIds: [],  // aggregate queries only
+    sensitivityMax: 'standard',
+    dataSources: [],
+  }),
+};
+
+
+4.2 Consent Verification
+Every context retrieval also checks consent:
+
+// src/services/consent.ts
+
+async function verifyConsent(
+  studentId: string,
+  requestedSources: DocumentSource[]
+): Promise<{ allowed: boolean; filteredSources: DocumentSource[] }> {
+  
+  const consent = await db.consent_records.findActive(studentId, 'ai_context');
+  
+  if (!consent || consent.status !== 'granted') {
+    return { allowed: false, filteredSources: [] };
+  }
+
+  // Filter to only consented data sources
+  const filteredSources = requestedSources.filter(
+    source => consent.data_sources.includes(source)
+  );
+
+  return { allowed: true, filteredSources };
+}
+
+
+5. Context Engine
+The heart of the product — takes a user’s chat query and returns an augmented prompt with relevant student context.
+
+// src/services/context-engine.ts
+
+interface ContextRequest {
+  userId: string;              // who is asking
+  query: string;               // what they asked
+  targetStudentId?: string;    // staff mode: which student
+  courseId?: string;            // optional course scope
+  maxChunks?: number;          // default 10
+}
+
+interface AugmentedPrompt {
+  systemPrompt: string;
+  userMessage: string;
+  chunksUsed: string[];        // chunk IDs for audit
+}
+
+async function buildAugmentedPrompt(req: ContextRequest): Promise<AugmentedPrompt> {
+  
+  // 1. Resolve permissions
+  const user = await getUser(req.userId);
+  const scope = PERMISSION_RULES[user.role](user);
+  
+  // 2. Determine target student(s)
+  const targetStudentId = req.targetStudentId || 
+    (user.role === 'student' ? user.id : null);
+  
+  if (targetStudentId && !scope.studentIds.includes(targetStudentId)) {
+    throw new ForbiddenError('No access to this student');
+  }
+
+  // 3. Check consent
+  const consent = await verifyConsent(targetStudentId, scope.dataSources);
+  if (!consent.allowed) {
+    // Return generic (non-augmented) prompt
+    return buildGenericPrompt(req.query);
+  }
+
+  // 4. Embed the query
+  const queryEmbedding = await embedText(req.query);
+
+  // 5. Vector similarity search scoped to student + permissions
+  const relevantChunks = await db.query(`
+    SELECT c.id, c.content, c.metadata, 
+           1 - (e.embedding <=> $1) as similarity
+    FROM embeddings e
+    JOIN chunks c ON c.id = e.chunk_id
+    JOIN documents d ON d.id = c.document_id
+    WHERE e.student_id = $2
+      AND c.sensitivity <= $3
+      AND d.source = ANY($4)
+    ORDER BY e.embedding <=> $1
+    LIMIT $5
+  `, [
+    queryEmbedding,
+    targetStudentId,
+    scope.sensitivityMax,
+    consent.filteredSources,
+    req.maxChunks || 10,
+  ]);
+
+  // 6. Build the augmented system prompt
+  const contextBlock = relevantChunks.map(chunk => 
+    `[${chunk.metadata.source} | ${chunk.metadata.date}]\n${chunk.content}`
+  ).join('\n\n');
+
+  const systemPrompt = buildSystemPrompt(user.role, targetStudentId, contextBlock);
+
+  // 7. Audit log
+  await logAudit({
+    actorId: req.userId,
+    action: 'context_retrieval',
+    targetStudentId,
+    details: {
+      query: req.query,
+      chunksRetrieved: relevantChunks.map(c => c.id),
+      chunkCount: relevantChunks.length,
+    },
+  });
+
+  return {
+    systemPrompt,
+    userMessage: req.query,
+    chunksUsed: relevantChunks.map(c => c.id),
+  };
+}
+
+function buildSystemPrompt(
+  role: UserRole, 
+  studentId: string, 
+  context: string
+): string {
+  
+  if (role === 'student') {
+    return `You are a personalized learning assistant for a student in an Ontario school.
+You have access to this student's academic history and context. Use it to provide
+personalized, encouraging, and educationally appropriate responses. Meet the student
+where they are based on their demonstrated knowledge and skills.
+
+Never reveal raw grades, scores, or sensitive information directly. Instead, use this
+context to calibrate your explanations and examples to their level.
+
+STUDENT CONTEXT:
+${context}
+
+GUIDELINES:
+- Reference specific topics they've studied when relevant
+- Build on concepts they've demonstrated understanding of
+- Identify and gently address gaps in prerequisite knowledge
+- Use encouraging, age-appropriate language
+- If asked about something outside their curriculum, connect it to what they know
+- Never fabricate or assume information not in the context`;
+  }
+
+  if (role === 'teacher') {
+    return `You are a classroom intelligence assistant for an Ontario teacher.
+You have access to student academic records and context for students in their classes.
+Provide data-informed insights while maintaining professional boundaries.
+
+STUDENT CONTEXT:
+${context}
+
+GUIDELINES:
+- Provide specific, actionable insights about student learning
+- Reference assessment data and assignment patterns
+- Flag potential learning gaps or concerning patterns
+- Suggest differentiation strategies based on student profiles
+- Help draft report card comments grounded in actual evidence
+- Maintain professional, clinical language
+- Note IEP accommodations when relevant to the query`;
+  }
+
+  // ... similar for guidance_counsellor, supply_teacher, etc.
+}
+
+
+6. Data Ingestion
+6.1 Google Classroom Integration
+
+// src/ingestion/google-classroom.ts
+
+interface GoogleClassroomSync {
+  boardId: string;
+  schoolId: string;
+  accessToken: string;  // OAuth token from board's Google admin
+}
+
+async function syncGoogleClassroom(config: GoogleClassroomSync) {
+  const classroom = google.classroom({ version: 'v1', auth: config.accessToken });
+
+  // 1. Sync courses
+  const courses = await classroom.courses.list({ courseStates: ['ACTIVE'] });
+  
+  for (const course of courses.data.courses) {
+    const dbCourse = await upsertCourse({
+      schoolId: config.schoolId,
+      externalId: course.id,
+      name: course.name,
+      source: 'google_classroom',
+      metadata: { section: course.section, room: course.room },
+    });
+
+    // 2. Sync roster
+    const students = await classroom.courses.students.list({ courseId: course.id });
+    const teachers = await classroom.courses.teachers.list({ courseId: course.id });
+    
+    await syncRoster(dbCourse.id, students.data.students, teachers.data.teachers);
+
+    // 3. Sync coursework and submissions
+    const coursework = await classroom.courses.courseWork.list({ courseId: course.id });
+    
+    for (const work of coursework.data.courseWork) {
+      const submissions = await classroom.courses.courseWork.studentSubmissions.list({
+        courseId: course.id,
+        courseWorkId: work.id,
+      });
+
+      for (const submission of submissions.data.studentSubmissions) {
+        await ingestSubmission(dbCourse, work, submission);
+      }
+    }
+  }
+}
+
+async function ingestSubmission(course, assignment, submission) {
+  const studentId = await resolveStudentId(submission.userId);
+  
+  // Build document content from submission
+  const content = buildSubmissionContent(assignment, submission);
+  
+  // Dedup check
+  const hash = sha256(content);
+  const existing = await db.documents.findByHash(hash);
+  if (existing) return;
+
+  // Create document
+  const doc = await db.documents.create({
+    studentId,
+    boardId: course.boardId,
+    source: 'google_classroom_submission',
+    sourceId: submission.id,
+    title: assignment.title,
+    content,
+    contentDate: submission.updateTime,
+    courseId: course.id,
+    sensitivity: 'standard',
+    metadata: {
+      assignmentType: assignment.workType,
+      grade: submission.assignedGrade,
+      maxGrade: assignment.maxPoints,
+      state: submission.state,
+      late: submission.late,
+    },
+    hash,
+  });
+
+  // Chunk and embed
+  await chunkAndEmbed(doc);
+}
+
+
+6.2 Chunking & Embedding Pipeline
+
+// src/ingestion/embedder.ts
+
+const CHUNK_SIZE = 500;      // tokens
+const CHUNK_OVERLAP = 50;    // token overlap between chunks
+
+async function chunkAndEmbed(document: Document) {
+  // 1. Split content into chunks
+  const chunks = splitIntoChunks(document.content, CHUNK_SIZE, CHUNK_OVERLAP);
+
+  for (let i = 0; i < chunks.length; i++) {
+    // 2. Store chunk
+    const chunk = await db.chunks.create({
+      documentId: document.id,
+      studentId: document.studentId,
+      boardId: document.boardId,
+      content: chunks[i].text,
+      chunkIndex: i,
+      tokenCount: chunks[i].tokenCount,
+      sensitivity: document.sensitivity,
+      metadata: {
+        ...document.metadata,
+        source: document.source,
+        date: document.contentDate,
+        title: document.title,
+      },
+    });
+
+    // 3. Generate embedding
+    const embedding = await generateEmbedding(chunks[i].text);
+
+    // 4. Store embedding
+    await db.embeddings.create({
+      chunkId: chunk.id,
+      studentId: document.studentId,
+      boardId: document.boardId,
+      embedding,
+      model: 'text-embedding-3-small',
+      sensitivity: document.sensitivity,
+    });
+  }
+}
+
+async function generateEmbedding(text: string): Promise<number[]> {
+  // Use OpenAI embeddings (good quality, cheap, fast)
+  // The CHAT model can be Claude while embeddings use OpenAI — this is common
+  const response = await openai.embeddings.create({
+    model: 'text-embedding-3-small',
+    input: text,
+  });
+  return response.data[0].embedding;
+}
+
+
+6.3 SIS Integration (Trillium/PowerSchool)
+
+// src/ingestion/sis.ts
+// Note: Trillium API specifics will need to be confirmed with TVDSB IT
+// Most Ontario SIS systems support SIF (Schools Interoperability Framework) or REST APIs
+
+interface SISConfig {
+  baseUrl: string;
+  apiKey: string;
+  boardId: string;
+}
+
+async function syncSISData(config: SISConfig) {
+  // Report cards
+  const reportCards = await fetchReportCards(config);
+  for (const rc of reportCards) {
+    await ingestDocument({
+      studentId: rc.studentId,
+      source: 'sis_report_card',
+      content: formatReportCard(rc),
+      contentDate: rc.reportingPeriodEnd,
+      sensitivity: 'standard',
+      metadata: {
+        term: rc.term,
+        grade: rc.gradeLevel,
+        learningSkills: rc.learningSkills,
+        teacherComments: rc.comments,
+      },
+    });
+  }
+
+  // IEPs — sensitive
+  const ieps = await fetchIEPs(config);
+  for (const iep of ieps) {
+    await ingestDocument({
+      studentId: iep.studentId,
+      source: 'sis_iep',
+      content: formatIEP(iep),
+      contentDate: iep.effectiveDate,
+      sensitivity: 'sensitive',
+      metadata: {
+        exceptionality: iep.exceptionality,
+        accommodations: iep.accommodations,
+        modifications: iep.modifications,
+        goals: iep.goals,
+      },
+    });
+  }
+
+  // Attendance
+  const attendance = await fetchAttendance(config);
+  // ... similar pattern
+}
+
+
+7. API Endpoints
+
+// src/routes/index.ts
+
+// ============ CHAT ============
+POST   /api/chat/message          // Send message, get context-augmented response
+GET    /api/chat/sessions          // List user's chat sessions
+GET    /api/chat/sessions/:id      // Get session with messages
+
+// ============ AUTH ============
+GET    /api/auth/sso               // Board SSO redirect (SAML/OIDC)
+POST   /api/auth/callback          // SSO callback
+POST   /api/auth/logout
+GET    /api/auth/me                // Current user + permissions
+
+// ============ CONSENT ============
+GET    /api/consent/:studentId     // Get consent status for a student
+POST   /api/consent/grant          // Parent grants consent
+POST   /api/consent/revoke         // Parent revokes consent
+GET    /api/consent/portal/:token  // Parent portal (tokenized link)
+
+// ============ STAFF ============
+GET    /api/staff/students         // List students in teacher's scope
+GET    /api/staff/students/:id/summary  // AI-generated student summary
+POST   /api/staff/report-comments  // Generate report card comments
+GET    /api/staff/class/:courseId/insights  // Class-level analytics
+
+// ============ ADMIN ============
+GET    /api/admin/sync/status      // Data sync status
+POST   /api/admin/sync/trigger     // Manual sync trigger
+GET    /api/admin/audit            // Audit log queries
+GET    /api/admin/usage            // Usage analytics
+GET    /api/admin/consent/overview // Board-wide consent status
+
+// ============ WEBHOOKS ============
+POST   /api/webhooks/google        // Google Classroom push notifications
+POST   /api/webhooks/sis           // SIS data change notifications
+
+
+8. Project Structure
+
+studentcontext/
+├── src/
+│   ├── server.ts                  // Express app entry
+│   ├── config/
+│   │   ├── index.ts               // env-based config
+│   │   ├── database.ts            // pg pool config
+│   │   └── llm.ts                 // LLM provider configs
+│   ├── db/
+│   │   ├── migrations/            // SQL migration files
+│   │   ├── queries/               // Typed query functions
+│   │   └── index.ts               // Database connection pool
+│   ├── services/
+│   │   ├── context-engine.ts      // Core RAG + augmentation
+│   │   ├── permissions.ts         // Role-based access control
+│   │   ├── consent.ts             // Consent verification
+│   │   ├── embedder.ts            // Chunking + embedding pipeline
+│   │   ├── llm-adapter.ts         // Multi-LLM abstraction
+│   │   └── audit.ts               // Audit logging
+│   ├── ingestion/
+│   │   ├── google-classroom.ts    // GC API sync
+│   │   ├── sis.ts                 // Trillium/PowerSchool sync
+│   │   ├── scheduler.ts           // Cron-based sync scheduling
+│   │   └── chunker.ts             // Text chunking logic
+│   ├── routes/
+│   │   ├── chat.ts
+│   │   ├── auth.ts
+│   │   ├── consent.ts
+│   │   ├── staff.ts
+│   │   ├── admin.ts
+│   │   └── webhooks.ts
+│   ├── middleware/
+│   │   ├── auth.ts                // JWT/session validation
+│   │   ├── rbac.ts                // Role-based route guards
+│   │   └── rate-limit.ts
+│   └── utils/
+│       ├── crypto.ts              // Hashing, token generation
+│       └── validators.ts
+├── client/                        // React frontend
+│   ├── src/
+│   │   ├── App.tsx
+│   │   ├── pages/
+│   │   │   ├── StudentChat.tsx
+│   │   │   ├── StaffPortal.tsx
+│   │   │   ├── ParentConsent.tsx
+│   │   │   └── AdminDashboard.tsx
+│   │   ├── components/
+│   │   │   ├── ChatInterface.tsx
+│   │   │   ├── StudentSelector.tsx
+│   │   │   ├── ConsentForm.tsx
+│   │   │   └── InsightCard.tsx
+│   │   └── hooks/
+│   │       ├── useChat.ts
+│   │       └── useAuth.ts
+│   └── package.json
+├── docker-compose.yml             // PostgreSQL + pgvector + app
+├── package.json
+├── tsconfig.json
+├── prompt_plan.md                 // Your Claude Code working doc
+└── progress.md                    // Sprint tracking
+
+
+9. Docker Compose (Dev Environment)
+
+version: '3.8'
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: studentcontext
+      POSTGRES_USER: sc_dev
+      POSTGRES_PASSWORD: dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./src/db/migrations:/docker-entrypoint-initdb.d
+
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://sc_dev:dev_password@db:5432/studentcontext
+      CLAUDE_API_KEY: ${CLAUDE_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}  # for embeddings
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      NODE_ENV: development
+    depends_on:
+      - db
+    volumes:
+      - ./src:/app/src
+
+volumes:
+  pgdata:
+
+
+10. Sprint Plan (prompt_plan.md)
+
+# StudentContext — Build Plan
+
+## Sprint 1: Foundation (Week 1-2)
+- [ ] Project scaffolding (TypeScript, Express, React)
+- [ ] PostgreSQL + pgvector Docker setup
+- [ ] Database migrations (all tables from spec)
+- [ ] Basic auth (JWT, session management)
+- [ ] User seed data for development
+- CHECKPOINT: Can connect to DB, run migrations, create test users
+
+## Sprint 2: Ingestion Pipeline (Week 3-4)
+- [ ] Google Classroom OAuth flow
+- [ ] Course/roster sync from Google Classroom
+- [ ] Assignment + submission ingestion
+- [ ] Text chunking service
+- [ ] OpenAI embedding integration
+- [ ] Document → chunk → embedding pipeline
+- CHECKPOINT: Can sync a test Google Classroom, see embeddings in DB
+
+## Sprint 3: Context Engine (Week 5-6)
+- [ ] Vector similarity search queries
+- [ ] Permission service (role-based scoping)
+- [ ] Consent verification
+- [ ] Prompt augmentation (system prompt builder)
+- [ ] Claude API integration for chat
+- [ ] Audit logging on every retrieval
+- CHECKPOINT: Can query as student, get personalized response with context
+
+## Sprint 4: Student Chat UI (Week 7-8)
+- [ ] React chat interface
+- [ ] Authentication flow (SSO stub)
+- [ ] Message streaming
+- [ ] Session management
+- [ ] Mobile-responsive design
+- CHECKPOINT: Student can log in, chat, get context-aware responses
+
+## Sprint 5: Staff Portal (Week 9-10)
+- [ ] Staff authentication + role detection
+- [ ] Student selector (scoped to teacher's classes)
+- [ ] Staff chat interface with student context
+- [ ] Report card comment generator
+- [ ] Class insights view
+- CHECKPOINT: Teacher can select a student, ask questions, get informed answers
+
+## Sprint 6: Consent & Admin (Week 11-12)
+- [ ] Parent consent portal (tokenized URLs)
+- [ ] Consent grant/revoke flows
+- [ ] Admin dashboard (sync status, usage, consent overview)
+- [ ] Audit log viewer
+- [ ] Data export / deletion capability
+- CHECKPOINT: Full consent flow works, admin can monitor system
+
+## Sprint 7: Pilot Prep (Week 13-14)
+- [ ] SIS integration (Trillium stub or real if API available)
+- [ ] SSO integration (board's SAML/OIDC)
+- [ ] Security audit / pen test
+- [ ] FIPPA compliance documentation
+- [ ] Deployment to Canadian hosting
+- [ ] Load testing for pilot school size
+- CHECKPOINT: Ready to deploy to pilot school
+
+
+11. Key Technical Decisions
+Embedding model: OpenAI text-embedding-3-small (1536 dimensions). Cheap ($0.02/1M tokens), fast, good quality. The chat LLM can be anything — embeddings are separate.
+Vector index: pgvector HNSW. At 82K students × ~100 documents each × ~5 chunks each = ~41M embeddings at full board scale. HNSW handles this on a single PostgreSQL instance with sufficient RAM (64GB at board scale). Pilot scale (2K students) is trivial.
+LLM abstraction: The llm-adapter.ts service wraps multiple providers behind a common interface. Start with Claude, but the board might mandate Copilot or Gemini. The adapter pattern keeps the context engine provider-agnostic.
+Multi-tenancy: Board-scoped at the data level (every table has board_id). This lets you run multiple boards on one infrastructure while maintaining strict data isolation. Row-level security in PostgreSQL can enforce this at the database level as a defense-in-depth measure.
+Sync strategy: Initial full sync + incremental via webhooks (Google Classroom supports push notifications). SIS sync via nightly batch until real-time integration is available. All syncs are idempotent (hash-based dedup).
+
+That’s your complete technical specification. Every table, every service, every endpoint, every sprint — all in your stack, all buildable by one person. Take this into Claude Code and start with Sprint 1. The database schema alone is probably 2-3 hours of work to have running with migrations.
+What do you want to name this thing?​​​​​​​​​​​​​​​​
