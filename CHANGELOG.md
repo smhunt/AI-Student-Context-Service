@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.0] - 2026-02-27
+
+### Added
+- Ingestion pipeline: document → chunk → embed → store with SHA-256 dedup
+- Text chunker: ~500-token chunks with 50-token overlap, word-boundary splitting
+- OpenAI embedding service using text-embedding-3-small (1536 dimensions)
+- Google Classroom sync: OAuth flow, courses, coursework, submissions, grades
+- Admin API routes: manual ingest, sync trigger, sync status
+- Google Classroom webhook endpoint (stub for push notifications)
+- DB query functions for documents, chunks, and embeddings
+- Vector similarity search via pgvector cosine distance
+- Sample seed documents (report card + assignment) with full pipeline ingestion
+- googleapis and openai npm dependencies
+
 ## [0.1.0] - 2026-02-27
 
 ### Added

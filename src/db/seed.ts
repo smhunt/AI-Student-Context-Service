@@ -1,12 +1,14 @@
 import { pool, transaction } from './index.js';
 import { hashPassword } from '../utils/crypto.js';
+import { ingestDocument } from '../ingestion/pipeline.js';
+import { config } from '../config/index.js';
 
 const DEV_PASSWORD = 'devpassword123';
 
 async function seed(): Promise<void> {
   const passwordHash = await hashPassword(DEV_PASSWORD);
 
-  await transaction(async (client) => {
+  const ids = await transaction(async (client) => {
     // Board
     const boardResult = await client.query(
       `INSERT INTO boards (name, slug, province)
@@ -187,7 +189,93 @@ async function seed(): Promise<void> {
     );
 
     console.log(`Consent: ai_context granted for Alex by Maria`);
+
+    // Store IDs for use after transaction
+    return { alexId, boardId };
   });
+
+  // Ingest sample documents for Alex (outside transaction since pipeline uses its own)
+  console.log('\nIngesting sample documents...');
+
+  const reportCardContent = `Student: Alex Johnson
+Course: MPM2D - Principles of Mathematics, Grade 10
+Term: Fall 2025
+Teacher: Sarah Chen
+
+Achievement Level Summary:
+- Knowledge and Understanding: Level 3+ (75%)
+- Thinking: Level 3 (72%)
+- Communication: Level 4 (85%)
+- Application: Level 3+ (78%)
+
+Overall Mark: 77% (B+)
+
+Teacher Comments:
+Alex has shown strong improvement in algebraic reasoning this term. Their work on linear systems demonstrated a solid understanding of both graphical and algebraic methods of solving. Alex participates actively in class discussions and asks thoughtful questions. Areas for growth include showing complete solutions on tests and reviewing work before submission. Alex's problem-solving skills are developing well, particularly in real-world application problems. I recommend continued practice with multi-step problems to strengthen analytical thinking.
+
+Learning Skills:
+- Responsibility: Good
+- Organization: Good
+- Independent Work: Excellent
+- Collaboration: Excellent
+- Initiative: Good
+- Self-Regulation: Good`;
+
+  const assignmentContent = `Assignment: Linear Systems Investigation
+Course: MPM2D - Principles of Mathematics
+Date: January 15, 2026
+Student: Alex Johnson
+
+Task: Investigate three different methods for solving a system of linear equations and present your findings.
+
+Alex's Submission:
+I compared graphing, substitution, and elimination methods for solving the system:
+2x + 3y = 12
+x - y = 1
+
+Method 1 - Graphing: I plotted both lines and found the intersection at (3, 2). This was visual but not very precise when the answer isn't a whole number.
+
+Method 2 - Substitution: From equation 2, x = y + 1. Substituting: 2(y+1) + 3y = 12, so 5y = 10, y = 2, x = 3. This was more precise.
+
+Method 3 - Elimination: Multiply equation 2 by 2: 2x - 2y = 2. Subtract from equation 1: 5y = 10, y = 2, x = 3. This was the fastest method.
+
+Conclusion: All three methods gave the same answer (3, 2). Elimination is most efficient for this type of system, but graphing helps visualize the solution.
+
+Grade: 85% (Level 4)
+Feedback: Excellent comparison of methods, Alex. Your analysis of the strengths and limitations of each approach shows strong mathematical thinking. Consider exploring what happens with systems that have no solution or infinite solutions.`;
+
+  try {
+    const result1 = await ingestDocument({
+      student_id: ids.alexId,
+      board_id: ids.boardId,
+      source: 'sis_report_card',
+      title: 'MPM2D Fall 2025 Report Card',
+      content: reportCardContent,
+      sensitivity: 'standard',
+      academic_year: '2025-2026',
+      metadata: { term: 'Fall 2025', course_code: 'MPM2D' },
+    });
+    console.log(`  Report card: ${result1.chunksCreated} chunks, ${result1.embeddingsCreated} embeddings`);
+
+    const result2 = await ingestDocument({
+      student_id: ids.alexId,
+      board_id: ids.boardId,
+      source: 'google_classroom_assignment',
+      title: 'Linear Systems Investigation',
+      content: assignmentContent,
+      sensitivity: 'standard',
+      academic_year: '2025-2026',
+      metadata: { course_code: 'MPM2D', assignment_type: 'investigation' },
+    });
+    console.log(`  Assignment: ${result2.chunksCreated} chunks, ${result2.embeddingsCreated} embeddings`);
+
+    if (!config.openaiApiKey) {
+      console.log('\n  Note: OPENAI_API_KEY not set — chunks created but embeddings skipped.');
+    }
+  } catch (err) {
+    console.error('  Warning: Document ingestion failed:', (err as Error).message);
+    console.log('  (This is OK if OPENAI_API_KEY is not set — core seed data was still created)');
+  }
 
   console.log('\nSeed completed successfully.');
   await pool.end();

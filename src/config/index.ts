@@ -9,6 +9,8 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   claudeApiKey: process.env.CLAUDE_API_KEY || '',
   openaiApiKey: process.env.OPENAI_API_KEY || '',
+  embeddingModel: 'text-embedding-3-small',
   googleClientId: process.env.GOOGLE_CLIENT_ID || '',
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+  googleRedirectUri: process.env.GOOGLE_REDIRECT_URI || 'https://dev.ecoworks.ca:3094/api/auth/google/callback',
 } as const;
