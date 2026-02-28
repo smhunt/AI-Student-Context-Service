@@ -1,75 +1,265 @@
 # Changelog
 
+All notable changes to StudentContext AI are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+For full architecture documentation, see [docs/README.md](docs/README.md).
+For API endpoint reference, see [docs/API.md](docs/API.md).
+
+---
+
 ## [0.5.0] - 2026-02-28
 
+Sprint 5: Staff Portal -- role-based tools for teachers, guidance counsellors, and school administrators.
+
 ### Added
-- Staff Portal: role-based UI for teachers, guidance counsellors, principals, and other staff
-- Student Selector: searchable, course-filtered student list in staff sidebar
-- Report Card Comment Generator: Ontario Growing Success-aligned comment generation with tone control, strengths/growth areas, learning skills, and copy-to-clipboard
-- Class Insights dashboard: student count, document coverage, data source breakdown
-- Staff API routes: GET /api/staff/students, GET /api/staff/courses, GET /api/staff/class/:courseId/insights, POST /api/staff/report-comments
-- Role-based routing: staff roles auto-redirect to /staff, students/parents to /chat
-- Tab navigation in Staff Portal: Chat, Report Comments, Class Insights
-- Staff-scoped chat: messages target selected student via target_student_id
+- **Staff Portal page** (`/staff`): tabbed interface with Chat, Report Comments, and Class Insights tabs for staff roles
+- **Student Selector component**: searchable sidebar listing students in the staff member's permission scope, filterable by course, displaying grade and course metadata per student
+- **Report Card Comment Generator**: Ontario Growing Success framework-aligned report card comment generation
+  - Tone selector (encouraging, balanced, direct)
+  - Optional strengths and growth areas input (comma-separated)
+  - Generated comment with character count and copy-to-clipboard button
+  - Learning Skills assessment (Responsibility, Organization, Independent Work, Collaboration, Initiative, Self-Regulation)
+  - Context-augmented: retrieves relevant student academic records via RAG pipeline
+  - Full audit logging of context retrieval for FIPPA compliance
+- **Class Insights dashboard**: course-level analytics showing student count, document count, data coverage percentage, students missing data, and document source breakdown with human-readable labels
+- **Staff API routes**:
+  - `GET /api/staff/students` -- list students in scope with course associations
+  - `GET /api/staff/courses` -- list staff member's courses with student counts
+  - `GET /api/staff/class/:courseId/insights` -- course-level data insights
+  - `POST /api/staff/report-comments` -- generate Ontario-aligned report card comments
+- **Role-based routing**: automatic redirect on login -- staff roles go to `/staff`, students and parents go to `/chat`
+- **Staff-scoped chat**: chat messages in Staff Portal automatically include `target_student_id` for the selected student
+- **Text-to-speech** (`useSpeech` hook): Web Speech API integration for reading AI responses aloud
+  - Play, pause, and stop controls on each assistant message
+  - Intelligent voice selection (prefers enhanced/premium voices, ranks by quality)
+  - Markdown stripping for clean speech output
+  - Long-text chunking (200-word segments) to prevent speech cutoff
+- **Utility module** (`roles.ts`): `isStaffRole()` and `getRoleLabel()` helper functions
+- **`useStaff` hook**: manages student list, course list, selected student/course, class insights, and report comment generation state
 
 ### Fixed
-- Demo user emails in LoginPage now match seed data (David Williams, Lisa Park, Maria Johnson)
+- Demo user emails in LoginPage now match seed data (David Williams for guidance, Lisa Park for principal, Maria Johnson for parent)
+- Mobile view improvements: `100dvh` viewport height, safe area insets for notched devices, overflow prevention
+
+### Changed
+- `App.tsx` now imports `isStaffRole` and implements `RoleRouter` for automatic role-based navigation
+- Login page quick-login buttons updated to 6 demo users matching the seed data
+
+---
 
 ## [0.4.0] - 2026-02-28
 
+Sprint 4: Student Chat UI -- full React frontend with login, real-time chat, and session management.
+
 ### Added
-- Student Chat UI: full React frontend with login, chat interface, and session management
-- Login page with email/password form and quick-login buttons for all 6 dev users
-- Chat interface with markdown rendering (react-markdown + remark-gfm), typing indicator, auto-scroll
-- Session sidebar: conversation history list, new chat, user info, sign out
-- Auth system: JWT token storage, AuthProvider context, protected routes
-- useChat hook: message state, optimistic updates, session loading, error handling
-- API client module with typed fetch wrapper and automatic 401 redirect
-- Responsive design: mobile sidebar overlay, collapsible header
-- Empty chat state with suggested prompts
-- Message metadata display (sources used, response latency)
-- react-router-dom, react-markdown, remark-gfm dependencies
+- **Login page** (`/login`): email and password form with form validation and error display
+  - Quick-login buttons for all 6 development users (Alex/Student, Sarah/Teacher, David/Guidance, Lisa/Principal, Maria/Parent, James/Board Admin)
+  - TVDSB branding with version tag
+- **Chat page** (`/chat`): full-featured chat interface for students and parents
+  - Markdown rendering of AI responses using `react-markdown` with `remark-gfm` (tables, strikethrough, task lists)
+  - Animated typing indicator (three-dot bounce) while awaiting response
+  - Auto-scroll to new messages with smooth scrolling behavior
+  - Message metadata: number of context sources used and response latency in seconds
+  - Empty state with suggested prompts ("How am I doing in math?", "Help me study for my science test", "What should I focus on next?")
+- **Session sidebar**: collapsible conversation history panel
+  - Lists all user sessions with mode label, message count, and relative timestamps
+  - New Chat button to start a fresh conversation
+  - User info display with name and role label
+  - Sign Out button
+- **Auth system**:
+  - `AuthProvider` React context wrapping the entire app
+  - JWT token persisted in localStorage (key: `sc_token`)
+  - Automatic token validation on page load via `GET /api/auth/me`
+  - Automatic redirect to `/login` on 401 responses
+  - `ProtectedRoute` component with loading spinner
+- **`useChat` hook**: chat state management
+  - Optimistic user message rendering (appears immediately before API response)
+  - Automatic session creation on first message
+  - Session loading and switching
+  - Error state management with automatic rollback of optimistic messages on failure
+- **API client module** (`client.ts`):
+  - Typed fetch wrapper with automatic Content-Type and Authorization headers
+  - 401 detection with token clearing and redirect
+  - Typed interfaces for all API responses (`ChatResponse`, `ChatSession`, `ChatMessageRecord`)
+  - Functions: `login`, `getMe`, `sendMessage`, `getSessions`, `getSession`
+- **Responsive design**:
+  - Mobile: sidebar overlays chat area
+  - Desktop: sidebar slides in beside chat
+  - Hamburger menu button to toggle sidebar
+  - Collapsible header with user name and role
+- **Frontend dependencies**: `react-router-dom` v7, `react-markdown` v10, `remark-gfm` v4
+
+### Changed
+- Vite config updated with HTTPS support (shared-certs) and proxy rules for `/api/*` and `/health` to backend on port 3094
+
+---
 
 ## [0.3.0] - 2026-02-27
 
+Sprint 3: Context Engine -- the complete RAG pipeline connecting user queries to student data through the Claude LLM.
+
 ### Added
-- Context Engine (RAG pipeline): embed query, vector search, permission-scoped augmentation, LLM chat
-- Permission Service: role-based access control for all 9 user roles
-- Consent Service: verifies parental consent before any context retrieval
-- LLM Adapter: provider-agnostic interface with Claude (Anthropic) implementation
-- Audit Service: logs every context retrieval and chat message for FIPPA compliance
-- Chat API routes: POST /api/chat/message, GET /api/chat/sessions, GET /api/chat/sessions/:id
-- Chat session management with multi-turn conversation support
-- Role-specific system prompt templates (student, teacher, guidance, principal, parent, supply, admin)
-- DB queries for consent verification, audit logging, chat sessions, staff-student scope resolution
-- Source filtering on vector similarity search for permission enforcement
-- @anthropic-ai/sdk dependency for Claude API integration
+- **Context Engine** (`context-engine.ts`): end-to-end RAG pipeline orchestrator
+  - Receives chat request with user query and optional target student
+  - Resolves permission scope (which students, sensitivity level, sources)
+  - Verifies parental consent before context retrieval
+  - Embeds query via OpenAI, performs vector similarity search
+  - Builds role-specific augmented system prompt with retrieved context
+  - Loads conversation history for multi-turn support
+  - Calls Claude LLM with full message history
+  - Stores both user and assistant messages
+  - Logs to audit trail (context retrieval + chat message events)
+  - Returns response with metadata (session ID, chunks used, token counts, latency)
+- **Permission Service** (`permissions.ts`): comprehensive RBAC scope resolution for all 9 user roles
+  - Each role maps to: accessible student IDs, maximum sensitivity level, allowed document sources, academic year scope
+  - Teacher: students in their courses (current + previous year), sensitive, all academic sources
+  - Educational Assistant: course-based or school-wide fallback, sensitive
+  - Guidance Counsellor: all school students, restricted, all sources including IEPs and guidance notes
+  - Principal/VP: all school students, restricted, all sources
+  - Supply Teacher: current courses only, standard, basic academic sources
+  - Parent: own children (via consent_records), standard, parent-visible sources
+  - Student: self only, standard, academic sources
+  - Board Admin: no individual student access (aggregate only)
+- **Consent Service** (`consent.ts`): parental consent verification
+  - Checks for active `ai_context` consent record with status `granted`
+  - Source intersection: only allows data sources that are both role-permitted AND parent-consented
+  - Blanket consent support: empty `data_sources` array treated as consent for all sources
+  - Returns `allowed` boolean and `filteredSources` list
+- **LLM Adapter** (`llm-adapter.ts`): provider-agnostic LLM interface
+  - `LLMProvider` interface with `chat(messages)` method
+  - `ClaudeProvider` implementation using `@anthropic-ai/sdk`
+  - System prompt extracted as separate Anthropic API parameter
+  - Returns content, model name, token counts (input/output), latency
+  - Singleton caching of provider instance
+  - Designed for future OpenAI/Gemini/Copilot adapters
+- **Audit Service** (`audit.ts`): FIPPA compliance logging
+  - `logContextRetrieval`: records actor, target student, query (truncated to 500 chars), chunk IDs, IP address
+  - `logChatMessage`: records actor, session, role, token counts
+  - All entries are append-only with timestamps
+- **Chat API routes** (`chat.ts`):
+  - `POST /api/chat/message` with Zod validation (message, session_id, target_student_id, course_id)
+  - `GET /api/chat/sessions` -- user's session list (up to 20)
+  - `GET /api/chat/sessions/:id` -- session detail with full message history (owner-verified)
+  - `PermissionError` handling returns 403
+  - LLM unavailable returns 503
+- **Chat session management** (`chat-sessions.ts`):
+  - `createChatSession`: creates session with mode, target student, LLM provider
+  - `addChatMessage`: stores message with chunks_used, token counts, latency; increments session message_count
+  - `getSessionMessages`: retrieves ordered messages for a session
+- **Role-specific system prompts**: 8 tailored prompt templates
+  - Student: encouraging learning companion, no raw grades, age-appropriate
+  - Teacher: clinical educator-to-educator, evidence-based observations, IEP-aware
+  - Guidance: holistic student support, concerning patterns, interventions
+  - Principal/VP: school-wide perspective, trends, resource allocation
+  - Supply Teacher: need-to-know basics, practical, no sensitive info
+  - Parent: clear non-jargon language, home support suggestions
+  - Board Admin: aggregate only, policy and planning
+  - Default fallback for any other role
+- **DB queries**: `findActiveConsent`, `getConsentedSources`, `createAuditEntry`, `findAuditEntries`, `createChatSession`, `findChatSession`, `findUserSessions`, `addChatMessage`, `getSessionMessages`, `currentAcademicYear`, `previousAcademicYear`, `getStudentIdsForTeacher`, `getSchoolStudentIds`, `getChildrenIds`, `getStaffSchoolIds`
+- **Dependencies**: `@anthropic-ai/sdk` v0.78.x
+
+---
 
 ## [0.2.0] - 2026-02-27
 
+Sprint 2: Ingestion Pipeline -- document processing, chunking, embedding, and Google Classroom integration.
+
 ### Added
-- Ingestion pipeline: document → chunk → embed → store with SHA-256 dedup
-- Text chunker: ~500-token chunks with 50-token overlap, word-boundary splitting
-- OpenAI embedding service using text-embedding-3-small (1536 dimensions)
-- Google Classroom sync: OAuth flow, courses, coursework, submissions, grades
-- Admin API routes: manual ingest, sync trigger, sync status
-- Google Classroom webhook endpoint (stub for push notifications)
-- DB query functions for documents, chunks, and embeddings
-- Vector similarity search via pgvector cosine distance
-- Sample seed documents (report card + assignment) with full pipeline ingestion
-- googleapis and openai npm dependencies
+- **Ingestion pipeline** (`pipeline.ts`): atomic document processing
+  - SHA-256 content hashing for deduplication (skips if hash exists)
+  - Document storage with source, sensitivity, metadata, academic year
+  - Text chunking into ~500-token segments with 50-token overlap
+  - OpenAI embedding generation for each chunk
+  - Full pipeline runs within a single PostgreSQL transaction
+  - Returns: documentId, chunksCreated, embeddingsCreated, duplicate flag
+- **Text chunker** (`chunker.ts`):
+  - Configurable chunk size (default: 500 tokens) and overlap (default: 50 tokens)
+  - Token estimation at ~4 characters per token
+  - Word-boundary splitting (looks backwards for space/newline to avoid mid-word breaks)
+  - Documents smaller than chunk size returned as single chunk
+  - Returns array of `{ text, tokenCount }` results
+- **Embedder service** (`embedder.ts`):
+  - `generateEmbedding(text)`: single text to 1536-dimension vector
+  - `generateEmbeddings(texts)`: batch embedding with automatic chunking at 2048 inputs per API call
+  - Index-sorted results to guarantee order
+  - Lazy singleton OpenAI client initialization
+- **Google Classroom sync** (`google-classroom.ts`):
+  - OAuth 2.0 flow with Google APIs (consent URL generation, token exchange)
+  - Required scopes: courses.readonly, coursework.students.readonly, rosters.readonly, student-submissions.students.readonly
+  - Full sync: list active courses, iterate coursework, fetch student submissions
+  - Ingests 3 document types per submission: assignment description, submission details, grade
+  - Maps Google Classroom students to local DB users by email
+  - Returns sync results: coursesProcessed, documentsIngested, errors
+- **Admin API routes** (`admin.ts`):
+  - `POST /api/admin/ingest`: manual document ingestion with Zod-validated body (student_email, source enum, content, sensitivity, metadata)
+  - `POST /api/admin/sync/trigger`: trigger Google Classroom sync with access token
+  - `GET /api/admin/sync/google-auth-url`: generate OAuth consent URL
+  - `GET /api/admin/sync/status`: document/chunk/embedding counts per board
+  - All routes restricted to board_admin, principal, vice_principal roles
+- **Google Classroom webhook** (`webhooks.ts`):
+  - `POST /api/webhooks/google`: stub endpoint for push notifications
+  - Handles sync verification requests (X-Goog-Resource-State: sync)
+  - Logs incoming notifications for future incremental sync implementation
+- **Vector similarity search** (`embeddings.ts`):
+  - `searchSimilar(queryVector, studentId, opts)`: cosine distance search via pgvector
+  - Filters by student_id, sensitivity level, document source
+  - Returns chunks with document title, source, distance score
+  - Configurable limit, threshold, and source filtering
+- **Seed data updates**: sample report card and assignment documents for Alex Johnson, processed through full pipeline (chunks + embeddings if OPENAI_API_KEY is set)
+- **Dependencies**: `googleapis` v171.x, `openai` v6.x
+
+---
 
 ## [0.1.0] - 2026-02-27
 
+Sprint 1: Foundation -- project scaffolding, database setup, authentication, and seed data.
+
 ### Added
-- Project scaffolding: TypeScript, ESM, Express backend, Vite React frontend
-- Docker Compose with pgvector/pgvector:pg16 on port 5438
-- Database migration system with 6 migration files covering full schema
-- PostgreSQL enums: user_role, document_source, sensitivity_level, consent_status
-- Tables: boards, schools, users, student_enrollments, staff_assignments, courses, course_memberships, documents, chunks, embeddings, consent_records, audit_log, chat_sessions, chat_messages
-- HNSW vector index for 1536-dimension embeddings (text-embedding-3-small)
-- Dev auth: email + password login with JWT tokens
-- Health check endpoint with DB connectivity verification
-- Seed data: TVDSB board, 2 schools, 6 users (all roles), 1 course, enrollment, consent
-- Minimal React frontend with health check display on port 3009
-- Architecture documentation in docs/README.md
+- **Project scaffolding**:
+  - TypeScript with ES modules (ESM), NodeNext module resolution
+  - Express 5.x backend with Helmet security headers and CORS
+  - Vite + React frontend (port 3009)
+  - Backend on port 3094 with HTTPS via shared certificates
+  - Docker Compose for PostgreSQL with pgvector extension
+- **Docker Compose** (`docker-compose.yml`):
+  - Image: `pgvector/pgvector:pg16` (PostgreSQL 16 with vector extension)
+  - Container name: `studentcontext-postgres`
+  - Port mapping: 5438 (host) -> 5432 (container)
+  - Named volume `pgdata` for persistence
+  - Health check: `pg_isready` every 5 seconds
+  - EcoWorks project labels
+- **Database migration system** (`migrate.ts`):
+  - `_migrations` tracking table with applied-at timestamps
+  - Sequential SQL file execution with transaction wrapping
+  - Rollback on failure, skip already-applied migrations
+- **6 migration files**:
+  - `001_extensions_and_enums.sql`: pgvector extension, uuid-ossp extension, 4 custom enum types (user_role with 9 values, document_source with 13 values, sensitivity_level with 3 values, consent_status with 4 values)
+  - `002_boards_and_schools.sql`: boards table (multi-tenant root with LLM config), schools table (board_id FK, unique school_code per board)
+  - `003_users_and_assignments.sql`: users table (9 roles, board-scoped external_id), student_enrollments (school+grade+year), staff_assignments (school+department+year), courses (school+code+year+semester), course_memberships (user+course, unique constraint), indexes on user email, board+role, enrollment school+year, course membership user/course
+  - `004_documents_and_vectors.sql`: documents table (student_id, source enum, sensitivity, SHA-256 hash), chunks table (document cascade, student+board denormalized, token count), embeddings table (vector(1536), HNSW index with m=16 ef_construction=64 vector_cosine_ops), indexes on student, source, hash, document
+  - `005_consent_and_audit.sql`: consent_records table (student, parent, board, type, status enum, data_sources array, IP/UA tracking), audit_log table (board, actor, action, target student, JSONB details, IP, session reference), indexes on consent status, audit actor/target/time
+  - `006_chat_sessions.sql`: chat_sessions table (user, board, mode, target student/course, LLM provider, message count), chat_messages table (session FK, role, content, chunks_used UUID array, token counts, latency), index on messages by session
+- **Authentication**:
+  - `POST /api/auth/dev-login`: email + password authentication with Zod validation
+  - JWT token generation with 24-hour expiry (userId, role, boardId payload)
+  - `GET /api/auth/me`: retrieve current user profile from token
+  - Auth middleware: Bearer token extraction, verification, request augmentation
+  - Password hashing with bcryptjs (10 salt rounds)
+- **Health check**: `GET /health` with PostgreSQL connectivity verification
+- **Database reset**: `npm run db:reset` drops all tables and custom types
+- **Seed data** (`seed.ts`):
+  - Board: Thames Valley District School Board (slug: tvdsb, province: ON)
+  - Schools: Medway High School (MHS, grades 9-12), Central Elgin Collegiate Institute (CECI, grades 9-12)
+  - 6 users across all primary roles (student, teacher, guidance_counsellor, principal, board_admin, parent), all with password `devpassword123`
+  - Student enrollment: Alex Johnson at Medway, Grade 10, 2025-2026
+  - Staff assignments: Sarah (Math), David (Guidance), Lisa (Admin) at Medway
+  - Course: MPM2D - Principles of Mathematics (Grade 10, S2, 2025-2026)
+  - Course memberships: Alex as student, Sarah as teacher
+  - Consent: Maria Johnson grants ai_context consent for Alex (4 data sources)
+- **Configuration** (`config/index.ts`): environment-based config with defaults for all settings
+- **Type definitions** (`types/index.ts`): TypeScript interfaces for all 14 database tables, JWT payload, Express request augmentation
+- **Query modules**: `findUserByEmail`, `findUserById`, `createUser`, `findBoardBySlug`
+- **Minimal React frontend**: Vite with React, health check display
