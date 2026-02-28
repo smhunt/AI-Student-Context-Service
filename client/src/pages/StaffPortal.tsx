@@ -93,7 +93,7 @@ export default function StaffPortal() {
           {activeTab === 'chat' && (
             <div className="staff-chat">
               <div className="chat-messages">
-                <MessageList messages={chat.messages} sending={chat.sending} />
+                <MessageList messages={chat.messages} sending={chat.sending} onSuggestionClick={(text) => chat.send(text, staff.selectedStudent?.id)} />
               </div>
               {chat.error && <div className="chat-error">{chat.error}</div>}
               <div className="chat-input-area">

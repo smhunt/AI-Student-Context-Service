@@ -62,7 +62,7 @@ export default function ChatPage() {
         </header>
 
         <div className="chat-messages">
-          <MessageList messages={chat.messages} sending={chat.sending} />
+          <MessageList messages={chat.messages} sending={chat.sending} onSuggestionClick={chat.send} />
         </div>
 
         {chat.error && (

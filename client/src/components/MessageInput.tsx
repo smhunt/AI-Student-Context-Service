@@ -17,6 +17,11 @@ export default function MessageInput({ onSend, disabled }: Props) {
     el.style.height = Math.min(el.scrollHeight, 200) + 'px';
   }, [text]);
 
+  // Keep focus on textarea
+  useEffect(() => {
+    if (!disabled) textareaRef.current?.focus();
+  }, [disabled]);
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!text.trim() || disabled) return;

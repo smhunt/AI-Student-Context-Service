@@ -6,9 +6,10 @@ import type { DisplayMessage } from '../hooks/useChat.js';
 interface Props {
   messages: DisplayMessage[];
   sending: boolean;
+  onSuggestionClick?: (text: string) => void;
 }
 
-export default function MessageList({ messages, sending }: Props) {
+export default function MessageList({ messages, sending, onSuggestionClick }: Props) {
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -22,9 +23,9 @@ export default function MessageList({ messages, sending }: Props) {
         <h2>StudentContext AI</h2>
         <p>Ask about your coursework, review concepts, or get personalized learning support.</p>
         <div className="suggestions">
-          <span>How am I doing in math?</span>
-          <span>Help me study for my science test</span>
-          <span>What should I focus on next?</span>
+          {['How am I doing in math?', 'Help me study for my science test', 'What should I focus on next?'].map(s => (
+            <button key={s} onClick={() => onSuggestionClick?.(s)}>{s}</button>
+          ))}
         </div>
       </div>
     );
