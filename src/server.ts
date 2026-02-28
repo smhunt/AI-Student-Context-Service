@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from './config/index.js';
-import { healthRouter, authRouter, adminRouter, webhooksRouter, chatRouter } from './routes/index.js';
+import { healthRouter, authRouter, adminRouter, webhooksRouter, chatRouter, staffRouter } from './routes/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -21,6 +21,7 @@ app.use(authRouter);
 app.use(adminRouter);
 app.use(webhooksRouter);
 app.use(chatRouter);
+app.use(staffRouter);
 
 const certsDir = path.resolve(__dirname, '..', '..', '.shared-certs');
 const sslOpts = {

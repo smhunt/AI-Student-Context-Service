@@ -41,7 +41,7 @@ export function useChat() {
     }
   }, []);
 
-  const send = useCallback(async (text: string) => {
+  const send = useCallback(async (text: string, targetStudentId?: string) => {
     if (!text.trim() || sending) return;
     setError(null);
     setSending(true);
@@ -60,6 +60,7 @@ export function useChat() {
       const res: ChatResponse = await sendMessage({
         message: text,
         session_id: activeSessionId ?? undefined,
+        target_student_id: targetStudentId,
       });
 
       // Set session if new

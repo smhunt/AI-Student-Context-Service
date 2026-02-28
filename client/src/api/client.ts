@@ -124,3 +124,62 @@ export async function getSession(id: string): Promise<{
     `/api/chat/sessions/${id}`
   );
 }
+
+// Staff
+export interface StaffStudent {
+  id: string;
+  name_first: string;
+  name_last: string;
+  email: string | null;
+  grade: number | null;
+  courses: { id: string; name: string; code: string | null; subject: string | null }[];
+}
+
+export interface StaffCourse {
+  id: string;
+  name: string;
+  code: string | null;
+  subject: string | null;
+}
+
+export async function getStaffStudents(): Promise<{
+  students: StaffStudent[];
+  courses: StaffCourse[];
+}> {
+  return request<{ students: StaffStudent[]; courses: StaffCourse[] }>('/api/staff/students');
+}
+
+export interface CourseInsights {
+  student_count: number;
+  document_count: number;
+  students_with_docs: number;
+  students_without_docs: number;
+  source_breakdown: Record<string, number>;
+}
+
+export async function getClassInsights(courseId: string): Promise<CourseInsights> {
+  return request<CourseInsights>(`/api/staff/class/${courseId}/insights`);
+}
+
+export interface ReportCommentResponse {
+  comment: string;
+  learning_skills: string;
+  student_name: string;
+  chunks_used: string[];
+  model: string;
+  latency_ms: number;
+}
+
+export async function generateReportComments(params: {
+  student_id: string;
+  course_id: string;
+  term?: string;
+  strengths?: string[];
+  growth_areas?: string[];
+  tone?: 'encouraging' | 'balanced' | 'direct';
+}): Promise<ReportCommentResponse> {
+  return request<ReportCommentResponse>('/api/staff/report-comments', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}

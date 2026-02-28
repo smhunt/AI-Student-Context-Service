@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.0] - 2026-02-28
+
+### Added
+- Staff Portal: role-based UI for teachers, guidance counsellors, principals, and other staff
+- Student Selector: searchable, course-filtered student list in staff sidebar
+- Report Card Comment Generator: Ontario Growing Success-aligned comment generation with tone control, strengths/growth areas, learning skills, and copy-to-clipboard
+- Class Insights dashboard: student count, document coverage, data source breakdown
+- Staff API routes: GET /api/staff/students, GET /api/staff/courses, GET /api/staff/class/:courseId/insights, POST /api/staff/report-comments
+- Role-based routing: staff roles auto-redirect to /staff, students/parents to /chat
+- Tab navigation in Staff Portal: Chat, Report Comments, Class Insights
+- Staff-scoped chat: messages target selected student via target_student_id
+
+### Fixed
+- Demo user emails in LoginPage now match seed data (David Williams, Lisa Park, Maria Johnson)
+
 ## [0.4.0] - 2026-02-28
 
 ### Added

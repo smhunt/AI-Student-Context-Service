@@ -5,9 +5,9 @@ import { useAuth } from '../hooks/useAuth.js';
 const DEMO_USERS = [
   { email: 'alex.johnson@tvdsb.on.ca', label: 'Alex Johnson', role: 'Student' },
   { email: 'sarah.chen@tvdsb.on.ca', label: 'Sarah Chen', role: 'Teacher' },
-  { email: 'mike.taylor@tvdsb.on.ca', label: 'Mike Taylor', role: 'Guidance' },
-  { email: 'lisa.martinez@tvdsb.on.ca', label: 'Lisa Martinez', role: 'Principal' },
-  { email: 'david.johnson@tvdsb.on.ca', label: 'David Johnson', role: 'Parent' },
+  { email: 'david.williams@tvdsb.on.ca', label: 'David Williams', role: 'Guidance' },
+  { email: 'lisa.park@tvdsb.on.ca', label: 'Lisa Park', role: 'Principal' },
+  { email: 'maria.johnson@tvdsb.on.ca', label: 'Maria Johnson', role: 'Parent' },
   { email: 'james.wilson@tvdsb.on.ca', label: 'James Wilson', role: 'Board Admin' },
 ];
 
