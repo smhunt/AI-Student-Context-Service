@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 // Strip markdown to plain text for speaking
-function stripMarkdown(md: string): string {
+export function stripMarkdown(md: string): string {
   return md
     // Remove code blocks
     .replace(/```[\s\S]*?```/g, '')
@@ -181,7 +181,7 @@ export function useSpeech() {
 }
 
 // Split text into ~200-word chunks at sentence boundaries
-function splitIntoSpeechChunks(text: string): string[] {
+export function splitIntoSpeechChunks(text: string): string[] {
   const sentences = text.match(/[^.!?]+[.!?]+[\s]*/g) || [text];
   const chunks: string[] = [];
   let current = '';
