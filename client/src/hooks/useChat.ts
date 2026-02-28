@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { sendMessage, getSessions, getSession, type ChatResponse, type ChatSession, type ChatMessageRecord } from '../api/client.js';
+import { useState, useCallback, useRef } from 'react';
+import { sendMessage, sendMessageStream, getSessions, getSession, type ChatResponse, type ChatSession, type ChatMessageRecord } from '../api/client.js';
 
 export interface DisplayMessage {
   id: string;
@@ -8,6 +8,7 @@ export interface DisplayMessage {
   chunksUsed?: string[];
   latencyMs?: number | null;
   createdAt: string;
+  streaming?: boolean;
 }
 
 export function useChat() {
@@ -15,8 +16,10 @@ export function useChat() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [streaming, setStreaming] = useState(false);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const streamingMsgId = useRef<string | null>(null);
 
   const loadSessions = useCallback(async () => {
     setLoadingSessions(true);
@@ -63,7 +66,6 @@ export function useChat() {
         target_student_id: targetStudentId,
       });
 
-      // Set session if new
       if (!activeSessionId) {
         setActiveSessionId(res.sessionId);
       }
@@ -80,12 +82,85 @@ export function useChat() {
       setMessages(prev => [...prev, assistantMsg]);
     } catch (err) {
       setError((err as Error).message);
-      // Remove optimistic message on error
       setMessages(prev => prev.filter(m => m.id !== tempId));
     } finally {
       setSending(false);
     }
   }, [activeSessionId, sending]);
+
+  const sendStreaming = useCallback(async (text: string, targetStudentId?: string) => {
+    if (!text.trim() || sending || streaming) return;
+    setError(null);
+    setSending(true);
+    setStreaming(true);
+
+    // Optimistic user message
+    const tempUserId = `temp-${Date.now()}`;
+    const userMsg: DisplayMessage = {
+      id: tempUserId,
+      role: 'user',
+      content: text,
+      createdAt: new Date().toISOString(),
+    };
+
+    // Placeholder assistant message for streaming
+    const streamId = `stream-${Date.now()}`;
+    streamingMsgId.current = streamId;
+    const streamMsg: DisplayMessage = {
+      id: streamId,
+      role: 'assistant',
+      content: '',
+      createdAt: new Date().toISOString(),
+      streaming: true,
+    };
+
+    setMessages(prev => [...prev, userMsg, streamMsg]);
+
+    try {
+      await sendMessageStream(
+        {
+          message: text,
+          session_id: activeSessionId ?? undefined,
+          target_student_id: targetStudentId,
+        },
+        // onText — append streaming chunk
+        (chunk) => {
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === streamId ? { ...m, content: m.content + chunk } : m
+            )
+          );
+        },
+        // onMetadata — finalize message with real data
+        (meta) => {
+          if (!activeSessionId && meta.sessionId) {
+            setActiveSessionId(meta.sessionId);
+          }
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === streamId
+                ? {
+                    ...m,
+                    id: meta.messageId,
+                    content: meta.content,
+                    chunksUsed: meta.chunksUsed,
+                    latencyMs: meta.latencyMs,
+                    streaming: false,
+                  }
+                : m
+            )
+          );
+        },
+      );
+    } catch (err) {
+      setError((err as Error).message);
+      setMessages(prev => prev.filter(m => m.id !== tempUserId && m.id !== streamId));
+    } finally {
+      setSending(false);
+      setStreaming(false);
+      streamingMsgId.current = null;
+    }
+  }, [activeSessionId, sending, streaming]);
 
   const newChat = useCallback(() => {
     setActiveSessionId(null);
@@ -98,9 +173,11 @@ export function useChat() {
     sessions,
     activeSessionId,
     sending,
+    streaming,
     loadingSessions,
     error,
     send,
+    sendStreaming,
     loadSessions,
     loadSession,
     newChat,

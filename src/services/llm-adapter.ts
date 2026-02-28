@@ -20,6 +20,7 @@ export interface LLMResponse {
 
 export interface LLMProvider {
   chat(messages: LLMMessage[]): Promise<LLMResponse>;
+  chatStream?(messages: LLMMessage[]): AsyncGenerator<string, LLMResponse>;
 }
 
 // ---------------------------------------------------------------------------
@@ -68,6 +69,42 @@ class ClaudeProvider implements LLMProvider {
       latencyMs,
     };
   }
+
+  async *chatStream(messages: LLMMessage[]): AsyncGenerator<string, LLMResponse> {
+    const systemMessages = messages.filter((m) => m.role === 'system');
+    const chatMessages = messages.filter((m) => m.role !== 'system');
+    const systemPrompt = systemMessages.map((m) => m.content).join('\n\n');
+
+    const start = Date.now();
+    const stream = this.client.messages.stream({
+      model: config.claudeModel,
+      max_tokens: config.chatMaxTokens,
+      temperature: config.chatTemperature,
+      system: systemPrompt || undefined,
+      messages: chatMessages.map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      })),
+    });
+
+    let fullContent = '';
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+        fullContent += event.delta.text;
+        yield event.delta.text;
+      }
+    }
+
+    const final = await stream.finalMessage();
+    const latencyMs = Date.now() - start;
+    return {
+      content: fullContent,
+      model: final.model,
+      tokenCountInput: final.usage.input_tokens,
+      tokenCountOutput: final.usage.output_tokens,
+      latencyMs,
+    };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -100,6 +137,45 @@ class OpenAIProvider implements LLMProvider {
       model: response.model,
       tokenCountInput: response.usage?.prompt_tokens || 0,
       tokenCountOutput: response.usage?.completion_tokens || 0,
+      latencyMs,
+    };
+  }
+
+  async *chatStream(messages: LLMMessage[]): AsyncGenerator<string, LLMResponse> {
+    const start = Date.now();
+    const stream = await this.client.chat.completions.create({
+      model: config.openaiChatModel,
+      max_tokens: config.chatMaxTokens,
+      temperature: config.chatTemperature,
+      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      stream: true,
+      stream_options: { include_usage: true },
+    });
+
+    let fullContent = '';
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let model = config.openaiChatModel;
+
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content;
+      if (delta) {
+        fullContent += delta;
+        yield delta;
+      }
+      if (chunk.usage) {
+        inputTokens = chunk.usage.prompt_tokens || 0;
+        outputTokens = chunk.usage.completion_tokens || 0;
+      }
+      if (chunk.model) model = chunk.model;
+    }
+
+    const latencyMs = Date.now() - start;
+    return {
+      content: fullContent,
+      model,
+      tokenCountInput: inputTokens,
+      tokenCountOutput: outputTokens,
       latencyMs,
     };
   }
@@ -185,6 +261,39 @@ class GroqProvider implements LLMProvider {
       model: response.model,
       tokenCountInput: response.usage?.prompt_tokens || 0,
       tokenCountOutput: response.usage?.completion_tokens || 0,
+      latencyMs,
+    };
+  }
+
+  async *chatStream(messages: LLMMessage[]): AsyncGenerator<string, LLMResponse> {
+    const start = Date.now();
+    const stream = await this.client.chat.completions.create({
+      model: config.groqModel,
+      max_tokens: config.chatMaxTokens,
+      temperature: config.chatTemperature,
+      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      stream: true,
+    });
+
+    let fullContent = '';
+    let model = config.groqModel;
+
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content;
+      if (delta) {
+        fullContent += delta;
+        yield delta;
+      }
+      if (chunk.model) model = chunk.model;
+    }
+
+    const latencyMs = Date.now() - start;
+    // Groq doesn't return usage in stream — use non-stream response for final counts
+    return {
+      content: fullContent,
+      model,
+      tokenCountInput: 0,
+      tokenCountOutput: 0,
       latencyMs,
     };
   }

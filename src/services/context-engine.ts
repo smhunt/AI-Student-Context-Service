@@ -8,7 +8,7 @@ import { resolvePermissionScope } from './permissions.js';
 import { verifyConsent } from './consent.js';
 import { logContextRetrieval, logChatMessage } from './audit.js';
 import { generateEmbedding } from './embedder.js';
-import { createLLMProvider, type LLMMessage } from './llm-adapter.js';
+import { createLLMProvider, type LLMMessage, type LLMResponse } from './llm-adapter.js';
 import { config } from '../config/index.js';
 import type { UserRole } from '../types/index.js';
 
@@ -191,6 +191,172 @@ export async function handleChatMessage(req: ContextRequest): Promise<ContextRes
     tokenCountOutput: llmResponse.tokenCountOutput,
     latencyMs: llmResponse.latencyMs,
   };
+}
+
+/**
+ * Streaming version of handleChatMessage.
+ * Yields text chunks as they arrive, then sends metadata at end.
+ */
+export async function* handleChatMessageStream(req: ContextRequest): AsyncGenerator<
+  { type: 'text'; text: string } | { type: 'metadata'; data: ContextResponse }
+> {
+  const user = await findUserById(req.userId);
+  if (!user || user.board_id !== req.boardId) {
+    throw new Error('User not found or board mismatch');
+  }
+
+  const role = user.role as UserRole;
+  const scope = await resolvePermissionScope(req.userId, req.boardId);
+
+  let targetStudentId: string | null = null;
+  if (role === 'student') {
+    targetStudentId = req.userId;
+  } else if (role === 'board_admin') {
+    targetStudentId = null;
+  } else if (req.targetStudentId) {
+    if (!scope.studentIds.includes(req.targetStudentId)) {
+      throw new PermissionError('You do not have permission to access this student\'s data');
+    }
+    targetStudentId = req.targetStudentId;
+  }
+
+  let contextBlock = '';
+  let chunksUsed: string[] = [];
+
+  if (targetStudentId && scope.dataSources.length > 0) {
+    const consent = await verifyConsent(targetStudentId, scope.dataSources);
+    if (consent.allowed) {
+      const queryVector = await generateEmbedding(req.query);
+      const results = await searchSimilar(queryVector, targetStudentId, {
+        maxSensitivity: scope.sensitivityMax,
+        limit: req.maxChunks ?? 5,
+        sources: consent.filteredSources,
+      });
+      if (results.length > 0) {
+        chunksUsed = results.map((r) => r.chunk_id);
+        contextBlock = results
+          .map((r) => `[${r.document_source}: ${r.document_title ?? 'Untitled'}]\n${r.content}`)
+          .join('\n\n---\n\n');
+      }
+    }
+  }
+
+  let studentName = '';
+  if (targetStudentId) {
+    const student = await findUserById(targetStudentId);
+    if (student) studentName = `${student.name_first} ${student.name_last}`;
+  }
+
+  const systemPrompt = buildSystemPrompt(role, studentName, contextBlock);
+
+  let sessionId = req.sessionId;
+  if (sessionId) {
+    const existing = await findChatSession(sessionId);
+    if (!existing || existing.user_id !== req.userId) {
+      throw new Error('Session not found or unauthorized');
+    }
+  } else {
+    const session = await createChatSession({
+      user_id: req.userId,
+      board_id: req.boardId,
+      mode: role === 'student' ? 'student_chat' : 'staff_chat',
+      target_student_id: targetStudentId ?? undefined,
+      target_course_id: req.courseId,
+      llm_provider: config.llmProvider,
+    });
+    sessionId = session.id;
+  }
+
+  const history = await getSessionMessages(sessionId);
+  const conversationMessages: LLMMessage[] = history.map((m) => ({
+    role: m.role as 'user' | 'assistant',
+    content: m.content,
+  }));
+
+  await addChatMessage({ session_id: sessionId, role: 'user', content: req.query });
+
+  const messages: LLMMessage[] = [
+    { role: 'system', content: systemPrompt },
+    ...conversationMessages,
+    { role: 'user', content: req.query },
+  ];
+
+  const llm = createLLMProvider(config.llmProvider);
+
+  if (llm.chatStream) {
+    const stream = llm.chatStream(messages);
+    let llmResponse: LLMResponse | undefined;
+
+    while (true) {
+      const { value, done } = await stream.next();
+      if (done) {
+        llmResponse = value as LLMResponse;
+        break;
+      }
+      yield { type: 'text', text: value as string };
+    }
+
+    if (llmResponse) {
+      const assistantMessage = await addChatMessage({
+        session_id: sessionId,
+        role: 'assistant',
+        content: llmResponse.content,
+        chunks_used: chunksUsed,
+        token_count_input: llmResponse.tokenCountInput,
+        token_count_output: llmResponse.tokenCountOutput,
+        latency_ms: llmResponse.latencyMs,
+      });
+
+      if (targetStudentId && chunksUsed.length > 0) {
+        await logContextRetrieval({
+          boardId: req.boardId, actorId: req.userId, targetStudentId,
+          query: req.query, chunksRetrieved: chunksUsed, chunkCount: chunksUsed.length,
+          sessionId, ipAddress: req.ipAddress,
+        });
+      }
+
+      await logChatMessage({
+        boardId: req.boardId, actorId: req.userId, targetStudentId,
+        sessionId, role: 'assistant',
+        tokenCountInput: llmResponse.tokenCountInput,
+        tokenCountOutput: llmResponse.tokenCountOutput,
+      });
+
+      yield {
+        type: 'metadata',
+        data: {
+          content: llmResponse.content,
+          sessionId,
+          messageId: assistantMessage.id,
+          chunksUsed,
+          model: llmResponse.model,
+          tokenCountInput: llmResponse.tokenCountInput,
+          tokenCountOutput: llmResponse.tokenCountOutput,
+          latencyMs: llmResponse.latencyMs,
+        },
+      };
+    }
+  } else {
+    // Fallback: non-streaming
+    const llmResponse = await llm.chat(messages);
+    yield { type: 'text', text: llmResponse.content };
+
+    const assistantMessage = await addChatMessage({
+      session_id: sessionId, role: 'assistant', content: llmResponse.content,
+      chunks_used: chunksUsed, token_count_input: llmResponse.tokenCountInput,
+      token_count_output: llmResponse.tokenCountOutput, latency_ms: llmResponse.latencyMs,
+    });
+
+    yield {
+      type: 'metadata',
+      data: {
+        content: llmResponse.content, sessionId, messageId: assistantMessage.id,
+        chunksUsed, model: llmResponse.model,
+        tokenCountInput: llmResponse.tokenCountInput, tokenCountOutput: llmResponse.tokenCountOutput,
+        latencyMs: llmResponse.latencyMs,
+      },
+    };
+  }
 }
 
 export class PermissionError extends Error {

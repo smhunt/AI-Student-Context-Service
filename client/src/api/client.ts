@@ -125,6 +125,65 @@ export async function getSession(id: string): Promise<{
   );
 }
 
+// Streaming chat
+export async function sendMessageStream(
+  params: {
+    message: string;
+    session_id?: string;
+    target_student_id?: string;
+    course_id?: string;
+  },
+  onText: (text: string) => void,
+  onMetadata?: (data: ChatResponse & { sessionId: string; messageId: string }) => void,
+): Promise<void> {
+  const token = getToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch('/api/chat/message/stream', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(params),
+  });
+
+  if (!res.ok || !res.body) {
+    throw new Error(`Stream request failed (${res.status})`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const data = line.slice(6);
+      if (data === '[DONE]') return;
+
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed.type === 'text') {
+          onText(parsed.text);
+        } else if (parsed.type === 'metadata') {
+          onMetadata?.(parsed);
+        } else if (parsed.type === 'error') {
+          throw new Error(parsed.error);
+        }
+      } catch (e) {
+        if (e instanceof SyntaxError) continue;
+        throw e;
+      }
+    }
+  }
+}
+
 // Staff
 export interface StaffStudent {
   id: string;

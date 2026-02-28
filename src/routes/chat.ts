@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod/v4';
 import { authMiddleware } from '../middleware/auth.js';
-import { handleChatMessage, PermissionError } from '../services/context-engine.js';
+import { handleChatMessage, handleChatMessageStream, PermissionError } from '../services/context-engine.js';
 import { findUserSessions, findChatSession, getSessionMessages } from '../db/queries/chat-sessions.js';
 
 const router = Router();
@@ -47,6 +47,54 @@ router.post('/api/chat/message', authMiddleware, async (req, res) => {
       return;
     }
     res.status(500).json({ error: 'Chat failed', message });
+  }
+});
+
+// Stream a chat message with SSE
+router.post('/api/chat/message/stream', authMiddleware, async (req, res) => {
+  const parsed = messageSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid request', details: parsed.error.issues });
+    return;
+  }
+
+  const { message, session_id, target_student_id, course_id } = parsed.data;
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+  });
+
+  try {
+    const stream = handleChatMessageStream({
+      userId: req.user!.userId,
+      boardId: req.user!.boardId,
+      query: message,
+      targetStudentId: target_student_id,
+      courseId: course_id,
+      sessionId: session_id,
+      ipAddress: req.ip,
+    });
+
+    for await (const chunk of stream) {
+      if (chunk.type === 'text') {
+        res.write(`data: ${JSON.stringify({ type: 'text', text: chunk.text })}\n\n`);
+      } else if (chunk.type === 'metadata') {
+        res.write(`data: ${JSON.stringify({ type: 'metadata', ...chunk.data })}\n\n`);
+      }
+    }
+
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (err) {
+    if (err instanceof PermissionError) {
+      res.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`);
+    } else {
+      console.error('Stream error:', err);
+      res.write(`data: ${JSON.stringify({ type: 'error', error: 'Stream failed' })}\n\n`);
+    }
+    res.end();
   }
 });
 
