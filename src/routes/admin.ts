@@ -3,6 +3,7 @@ import { z } from 'zod/v4';
 import { authMiddleware } from '../middleware/auth.js';
 import { ingestDocument } from '../ingestion/pipeline.js';
 import { query } from '../db/index.js';
+import { findAuditEntries } from '../db/queries/audit.js';
 import type { UserRole } from '../types/index.js';
 
 const router = Router();
@@ -135,6 +136,258 @@ router.get('/api/admin/sync/status', authMiddleware, async (req, res) => {
   );
 
   res.json(stats.rows[0]);
+});
+
+// Audit log — query audit entries with actor/target name joins
+router.get('/api/admin/audit', authMiddleware, async (req, res) => {
+  if (!requireAdmin(req)) {
+    res.status(403).json({ error: 'Admin access required' });
+    return;
+  }
+
+  const actorId = req.query.actor_id as string | undefined;
+  const targetStudentId = req.query.target_student_id as string | undefined;
+  const action = req.query.action as string | undefined;
+  const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+  const offset = parseInt(req.query.offset as string) || 0;
+
+  // Build query with joins for actor and target names
+  const conditions = ['al.board_id = $1'];
+  const params: unknown[] = [req.user!.boardId];
+  let idx = 2;
+
+  if (actorId) {
+    conditions.push(`al.actor_id = $${idx++}`);
+    params.push(actorId);
+  }
+  if (targetStudentId) {
+    conditions.push(`al.target_student_id = $${idx++}`);
+    params.push(targetStudentId);
+  }
+  if (action) {
+    conditions.push(`al.action = $${idx++}`);
+    params.push(action);
+  }
+
+  const whereClause = conditions.join(' AND ');
+
+  const [entriesResult, countResult] = await Promise.all([
+    query<{
+      id: string;
+      board_id: string;
+      actor_id: string;
+      action: string;
+      target_student_id: string | null;
+      details: Record<string, unknown>;
+      ip_address: string | null;
+      session_id: string | null;
+      created_at: Date;
+      actor_name: string | null;
+      target_name: string | null;
+    }>(
+      `SELECT al.*,
+         CONCAT(actor.name_first, ' ', actor.name_last) as actor_name,
+         CASE WHEN target.id IS NOT NULL
+           THEN CONCAT(target.name_first, ' ', target.name_last)
+           ELSE NULL
+         END as target_name
+       FROM audit_log al
+       LEFT JOIN users actor ON actor.id = al.actor_id
+       LEFT JOIN users target ON target.id = al.target_student_id
+       WHERE ${whereClause}
+       ORDER BY al.created_at DESC
+       LIMIT $${idx++} OFFSET $${idx}`,
+      [...params, limit, offset]
+    ),
+    query<{ total: string }>(
+      `SELECT count(*)::text as total FROM audit_log al WHERE ${whereClause}`,
+      params
+    ),
+  ]);
+
+  res.json({
+    entries: entriesResult.rows,
+    total: parseInt(countResult.rows[0].total, 10),
+  });
+});
+
+// Dashboard — board-wide statistics
+router.get('/api/admin/dashboard', authMiddleware, async (req, res) => {
+  if (!requireAdmin(req)) {
+    res.status(403).json({ error: 'Admin access required' });
+    return;
+  }
+
+  const boardId = req.user!.boardId;
+
+  const [
+    userCounts,
+    contentCounts,
+    sessionCounts,
+    consentCounts,
+    recentActivity,
+  ] = await Promise.all([
+    // User role counts
+    query<{ role: string; count: string }>(
+      `SELECT role, count(*)::text as count
+       FROM users WHERE board_id = $1
+       GROUP BY role`,
+      [boardId]
+    ),
+
+    // Document, chunk, embedding counts
+    query<{ documents: number; chunks: number; embeddings: number }>(
+      `SELECT
+         (SELECT count(*) FROM documents WHERE board_id = $1)::int as documents,
+         (SELECT count(*) FROM chunks WHERE board_id = $1)::int as chunks,
+         (SELECT count(*) FROM embeddings WHERE board_id = $1)::int as embeddings`,
+      [boardId]
+    ),
+
+    // Session and message counts
+    query<{ sessions: number; messages: number }>(
+      `SELECT
+         (SELECT count(*) FROM chat_sessions WHERE board_id = $1)::int as sessions,
+         (SELECT count(*) FROM chat_messages cm
+          JOIN chat_sessions cs ON cs.id = cm.session_id
+          WHERE cs.board_id = $1)::int as messages`,
+      [boardId]
+    ),
+
+    // Consent stats
+    query<{ status: string; count: string }>(
+      `SELECT status::text, count(*)::text as count
+       FROM consent_records WHERE board_id = $1
+       GROUP BY status`,
+      [boardId]
+    ),
+
+    // Recent audit activity
+    query<{
+      id: string;
+      actor_id: string;
+      action: string;
+      target_student_id: string | null;
+      created_at: Date;
+      actor_name: string | null;
+      target_name: string | null;
+    }>(
+      `SELECT al.id, al.actor_id, al.action, al.target_student_id, al.created_at,
+         CONCAT(actor.name_first, ' ', actor.name_last) as actor_name,
+         CASE WHEN target.id IS NOT NULL
+           THEN CONCAT(target.name_first, ' ', target.name_last)
+           ELSE NULL
+         END as target_name
+       FROM audit_log al
+       LEFT JOIN users actor ON actor.id = al.actor_id
+       LEFT JOIN users target ON target.id = al.target_student_id
+       WHERE al.board_id = $1
+       ORDER BY al.created_at DESC
+       LIMIT 10`,
+      [boardId]
+    ),
+  ]);
+
+  // Build role counts map
+  const roleCounts: Record<string, number> = {};
+  let totalStudents = 0;
+  let totalStaff = 0;
+  let totalUsers = 0;
+  const staffRoles = [
+    'teacher', 'educational_assistant', 'guidance_counsellor',
+    'vice_principal', 'principal', 'board_admin', 'supply_teacher',
+  ];
+
+  for (const row of userCounts.rows) {
+    const count = parseInt(row.count, 10);
+    roleCounts[row.role] = count;
+    totalUsers += count;
+    if (row.role === 'student') totalStudents = count;
+    if (staffRoles.includes(row.role)) totalStaff += count;
+  }
+
+  // Build consent stats
+  const consentStats: Record<string, number> = {
+    granted: 0, pending: 0, denied: 0, revoked: 0,
+  };
+  for (const row of consentCounts.rows) {
+    consentStats[row.status] = parseInt(row.count, 10);
+  }
+
+  res.json({
+    stats: {
+      total_users: totalUsers,
+      total_students: totalStudents,
+      total_staff: totalStaff,
+      role_counts: roleCounts,
+      total_documents: contentCounts.rows[0].documents,
+      total_chunks: contentCounts.rows[0].chunks,
+      total_embeddings: contentCounts.rows[0].embeddings,
+      total_sessions: sessionCounts.rows[0].sessions,
+      total_messages: sessionCounts.rows[0].messages,
+      consent_stats: consentStats,
+      recent_activity: recentActivity.rows,
+    },
+  });
+});
+
+// Users list — paginated user list with filtering
+router.get('/api/admin/users', authMiddleware, async (req, res) => {
+  if (!requireAdmin(req)) {
+    res.status(403).json({ error: 'Admin access required' });
+    return;
+  }
+
+  const role = req.query.role as string | undefined;
+  const search = req.query.search as string | undefined;
+  const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+  const offset = parseInt(req.query.offset as string) || 0;
+
+  const conditions = ['board_id = $1'];
+  const params: unknown[] = [req.user!.boardId];
+  let idx = 2;
+
+  if (role) {
+    conditions.push(`role = $${idx++}`);
+    params.push(role);
+  }
+  if (search) {
+    conditions.push(
+      `(name_first ILIKE $${idx} OR name_last ILIKE $${idx} OR email ILIKE $${idx})`
+    );
+    params.push(`%${search}%`);
+    idx++;
+  }
+
+  const whereClause = conditions.join(' AND ');
+
+  const [usersResult, countResult] = await Promise.all([
+    query<{
+      id: string;
+      email: string | null;
+      name_first: string;
+      name_last: string;
+      role: string;
+      active: boolean;
+      created_at: Date;
+    }>(
+      `SELECT id, email, name_first, name_last, role, active, created_at
+       FROM users
+       WHERE ${whereClause}
+       ORDER BY name_last, name_first
+       LIMIT $${idx++} OFFSET $${idx}`,
+      [...params, limit, offset]
+    ),
+    query<{ total: string }>(
+      `SELECT count(*)::text as total FROM users WHERE ${whereClause}`,
+      params
+    ),
+  ]);
+
+  res.json({
+    users: usersResult.rows,
+    total: parseInt(countResult.rows[0].total, 10),
+  });
 });
 
 export default router;
