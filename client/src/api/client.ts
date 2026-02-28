@@ -346,6 +346,20 @@ export async function getAdminAudit(params?: {
   return request<{ entries: AuditEntry[]; total: number }>(`/api/admin/audit?${qs}`);
 }
 
+export interface UsageStats {
+  total_requests: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_cost_usd: number;
+  by_provider: { provider: string; requests: number; tokens: number; cost: number }[];
+  by_model: { model: string; requests: number; tokens: number; cost: number }[];
+  daily: { date: string; requests: number; tokens: number; cost: number }[];
+}
+
+export async function getUsageStats(days: number = 30): Promise<{ stats: UsageStats }> {
+  return request<{ stats: UsageStats }>(`/api/admin/usage?days=${days}`);
+}
+
 export async function getAdminUsers(params?: {
   role?: string;
   search?: string;

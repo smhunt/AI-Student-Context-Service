@@ -390,6 +390,19 @@ router.get('/api/admin/users', authMiddleware, async (req, res) => {
   });
 });
 
+// Token usage & billing stats
+router.get('/api/admin/usage', authMiddleware, async (req, res) => {
+  if (!requireAdmin(req)) {
+    res.status(403).json({ error: 'Admin access required' });
+    return;
+  }
+
+  const days = Math.min(parseInt(req.query.days as string) || 30, 365);
+  const { getUsageStats } = await import('../db/queries/token-usage.js');
+  const stats = await getUsageStats(req.user!.boardId, days);
+  res.json({ stats });
+});
+
 // LLM provider listing — shows which providers are configured
 router.get('/api/admin/llm-providers', authMiddleware, async (req, res) => {
   if (!requireAdmin(req)) {

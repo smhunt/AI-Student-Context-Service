@@ -9,6 +9,7 @@ import { verifyConsent } from './consent.js';
 import { logContextRetrieval, logChatMessage } from './audit.js';
 import { generateEmbedding } from './embedder.js';
 import { createLLMProvider, type LLMMessage, type LLMResponse } from './llm-adapter.js';
+import { createGateway } from './llm-gateway.js';
 import { config } from '../config/index.js';
 import type { UserRole } from '../types/index.js';
 
@@ -142,9 +143,13 @@ export async function handleChatMessage(req: ContextRequest): Promise<ContextRes
     { role: 'user', content: req.query },
   ];
 
-  // 10. Call LLM
-  const llm = createLLMProvider('claude');
-  const llmResponse = await llm.chat(messages);
+  // 10. Call LLM via gateway (with token tracking)
+  const gateway = createGateway(config.llmProvider);
+  const llmResponse = await gateway.chat(messages, {
+    boardId: req.boardId,
+    userId: req.userId,
+    sessionId,
+  });
 
   // 11. Store assistant response
   const assistantMessage = await addChatMessage({
@@ -281,12 +286,13 @@ export async function* handleChatMessageStream(req: ContextRequest): AsyncGenera
     { role: 'user', content: req.query },
   ];
 
-  const llm = createLLMProvider(config.llmProvider);
+  const gateway = createGateway(config.llmProvider);
+  const gatewayOpts = { boardId: req.boardId, userId: req.userId, sessionId };
 
-  if (llm.chatStream) {
-    const stream = llm.chatStream(messages);
-    let llmResponse: LLMResponse | undefined;
+  const stream = gateway.chatStream(messages, gatewayOpts);
+  let llmResponse: LLMResponse | undefined;
 
+  {
     while (true) {
       const { value, done } = await stream.next();
       if (done) {
@@ -336,26 +342,6 @@ export async function* handleChatMessageStream(req: ContextRequest): AsyncGenera
         },
       };
     }
-  } else {
-    // Fallback: non-streaming
-    const llmResponse = await llm.chat(messages);
-    yield { type: 'text', text: llmResponse.content };
-
-    const assistantMessage = await addChatMessage({
-      session_id: sessionId, role: 'assistant', content: llmResponse.content,
-      chunks_used: chunksUsed, token_count_input: llmResponse.tokenCountInput,
-      token_count_output: llmResponse.tokenCountOutput, latency_ms: llmResponse.latencyMs,
-    });
-
-    yield {
-      type: 'metadata',
-      data: {
-        content: llmResponse.content, sessionId, messageId: assistantMessage.id,
-        chunksUsed, model: llmResponse.model,
-        tokenCountInput: llmResponse.tokenCountInput, tokenCountOutput: llmResponse.tokenCountOutput,
-        latencyMs: llmResponse.latencyMs,
-      },
-    };
   }
 }
 

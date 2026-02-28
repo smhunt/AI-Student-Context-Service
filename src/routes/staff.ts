@@ -5,7 +5,8 @@ import { resolvePermissionScope } from '../services/permissions.js';
 import { verifyConsent } from '../services/consent.js';
 import { generateEmbedding } from '../services/embedder.js';
 import { searchSimilar } from '../db/queries/embeddings.js';
-import { createLLMProvider, type LLMMessage } from '../services/llm-adapter.js';
+import { type LLMMessage } from '../services/llm-adapter.js';
+import { createGateway } from '../services/llm-gateway.js';
 import { logContextRetrieval } from '../services/audit.js';
 import {
   getStudentsWithCourses, getSchoolStudentsWithInfo,
@@ -187,13 +188,17 @@ LEARNING_SKILLS: [comma-separated brief observations]
 ${contextBlock ? `\n## Student Academic Context\n\n${contextBlock}` : 'No student records available. Generate a generic but professional comment template.'}`;
 
   try {
-    const llm = createLLMProvider('claude');
+    const gateway = createGateway();
     const messages: LLMMessage[] = [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: `Generate a report card comment for ${studentName}.` },
     ];
 
-    const llmResponse = await llm.chat(messages);
+    const llmResponse = await gateway.chat(messages, {
+      boardId: req.user!.boardId,
+      userId: req.user!.userId,
+      requestType: 'report_comment',
+    });
 
     // Parse the response
     const content = llmResponse.content;
