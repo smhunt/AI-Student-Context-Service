@@ -21,11 +21,15 @@
 }
 
 html, body, #root {
-  height: 100%;
+  height: 100vh;
+  height: 100dvh;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   color: var(--text);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
 }
 
 /* === Loading screen === */
@@ -35,6 +39,7 @@ html, body, #root {
   align-items: center;
   justify-content: center;
   height: 100vh;
+  height: 100dvh;
   gap: 12px;
   color: var(--text-muted);
 }
@@ -58,8 +63,11 @@ html, body, #root {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 20px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  overflow-y: auto;
 }
 
 .login-card {
@@ -204,6 +212,7 @@ html, body, #root {
 .chat-layout {
   display: flex;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -296,6 +305,8 @@ html, body, #root {
   min-width: 0;
   line-height: 1.6;
   font-size: 15px;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .message-body p { margin-bottom: 8px; }
@@ -348,6 +359,9 @@ html, body, #root {
   border-collapse: collapse;
   margin: 12px 0;
   font-size: 14px;
+  display: block;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .message-body th, .message-body td {
@@ -513,7 +527,7 @@ html, body, #root {
 
 /* === Message Input === */
 .chat-input-area {
-  padding: 12px 16px 20px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
   background: var(--bg);
   flex-shrink: 0;
 }
@@ -576,6 +590,7 @@ html, body, #root {
   flex-direction: column;
   flex-shrink: 0;
   height: 100vh;
+  height: 100dvh;
 }
 
 .sidebar-header {
@@ -704,6 +719,7 @@ html, body, #root {
 .staff-layout {
   display: flex;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -715,6 +731,7 @@ html, body, #root {
   flex-direction: column;
   flex-shrink: 0;
   height: 100vh;
+  height: 100dvh;
 }
 
 .staff-sidebar .staff-sidebar-footer {
@@ -1084,8 +1101,11 @@ html, body, #root {
     position: fixed;
     top: 0;
     left: 0;
+    bottom: 0;
     z-index: 100;
     width: 280px;
+    height: 100vh;
+    height: 100dvh;
     box-shadow: 4px 0 20px rgba(0,0,0,0.3);
   }
 
@@ -1096,7 +1116,31 @@ html, body, #root {
 
   .header-role { display: none; }
 
+  .chat-header h1 { font-size: 15px; }
+
   .message-list { padding: 16px 12px; }
+
+  .message { gap: 8px; margin-bottom: 16px; }
+
+  .message-avatar { width: 28px; height: 28px; font-size: 10px; }
+
+  .message-body { font-size: 14px; }
+
+  .message-body pre {
+    padding: 10px;
+    font-size: 12px;
+    max-width: calc(100vw - 80px);
+  }
+
+  .chat-input-area {
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .message-input {
+    padding: 6px 6px 6px 12px;
+  }
+
+  .message-input textarea { font-size: 16px; /* Prevents iOS zoom on focus */ }
 
   .demo-grid { grid-template-columns: 1fr; }
 
@@ -1109,8 +1153,11 @@ html, body, #root {
     position: fixed;
     top: 0;
     left: 0;
+    bottom: 0;
     z-index: 100;
     width: 280px;
+    height: 100vh;
+    height: 100dvh;
     box-shadow: 4px 0 20px rgba(0,0,0,0.15);
   }
 
@@ -1121,5 +1168,17 @@ html, body, #root {
 
   .tab { padding: 10px 14px; font-size: 13px; }
 
+  .tab-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
   .insights-grid { grid-template-columns: 1fr 1fr; }
+
+  .report-form { max-width: 100%; }
+
+  .staff-tab-content { padding: 16px 12px; }
+
+  .empty-icon { font-size: 36px; }
+  .empty-chat h2 { font-size: 18px; }
+  .empty-chat p { font-size: 14px; }
+
+  .btn-speech { width: 28px; height: 28px; }
 }
