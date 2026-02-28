@@ -10,11 +10,22 @@ interface Props {
 }
 
 export default function MessageList({ messages, sending, onSuggestionClick }: Props) {
+  const lastMsgRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
+  const prevCountRef = useRef(messages.length);
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, sending]);
+    if (messages.length > prevCountRef.current) {
+      // New message arrived — scroll its top into view
+      lastMsgRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    prevCountRef.current = messages.length;
+  }, [messages]);
+
+  // Scroll to typing indicator when it appears
+  useEffect(() => {
+    if (sending) endRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [sending]);
 
   if (messages.length === 0 && !sending) {
     return (
@@ -33,8 +44,8 @@ export default function MessageList({ messages, sending, onSuggestionClick }: Pr
 
   return (
     <div className="message-list">
-      {messages.map(msg => (
-        <div key={msg.id} className={`message message-${msg.role}`}>
+      {messages.map((msg, i) => (
+        <div key={msg.id} ref={i === messages.length - 1 ? lastMsgRef : undefined} className={`message message-${msg.role}`}>
           <div className="message-avatar">
             {msg.role === 'user' ? 'You' : 'AI'}
           </div>
