@@ -5,11 +5,15 @@ import ProtectedRoute from './components/ProtectedRoute.js';
 import LoginPage from './pages/LoginPage.js';
 import ChatPage from './pages/ChatPage.js';
 import StaffPortal from './pages/StaffPortal.js';
+import ParentConsent from './pages/ParentConsent.js';
+import AdminDashboard from './pages/AdminDashboard.js';
 import './styles/index.css';
 
 function RoleRouter() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
+  if (user.role === 'parent') return <Navigate to="/consent" replace />;
+  if (user.role === 'board_admin') return <Navigate to="/admin" replace />;
   if (isStaffRole(user.role)) return <Navigate to="/staff" replace />;
   return <Navigate to="/chat" replace />;
 }
@@ -33,6 +37,22 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <StaffPortal />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/consent"
+            element={
+              <ProtectedRoute>
+                <ParentConsent />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <AdminDashboard />
               </ProtectedRoute>
             }
           />

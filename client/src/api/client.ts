@@ -183,3 +183,120 @@ export async function generateReportComments(params: {
     body: JSON.stringify(params),
   });
 }
+
+// === Consent ===
+
+export interface ConsentChild {
+  id: string;
+  name_first: string;
+  name_last: string;
+  email: string | null;
+  consent: {
+    status: string;
+    data_sources: string[];
+    granted_at: string | null;
+    revoked_at: string | null;
+  } | null;
+}
+
+export async function getConsentChildren(): Promise<{ children: ConsentChild[] }> {
+  return request<{ children: ConsentChild[] }>('/api/consent/children');
+}
+
+export async function getStudentConsent(studentId: string): Promise<{
+  consent: any;
+  student: { name_first: string; name_last: string };
+}> {
+  return request(`/api/consent/${studentId}`);
+}
+
+export async function grantConsent(
+  studentId: string,
+  dataSources: string[]
+): Promise<{ consent: any }> {
+  return request<{ consent: any }>('/api/consent/grant', {
+    method: 'POST',
+    body: JSON.stringify({ student_id: studentId, data_sources: dataSources }),
+  });
+}
+
+export async function revokeConsent(studentId: string): Promise<{ consent: any }> {
+  return request<{ consent: any }>('/api/consent/revoke', {
+    method: 'POST',
+    body: JSON.stringify({ student_id: studentId }),
+  });
+}
+
+// === Admin ===
+
+export interface AdminStats {
+  total_users: number;
+  total_students: number;
+  total_staff: number;
+  total_documents: number;
+  total_chunks: number;
+  total_embeddings: number;
+  total_sessions: number;
+  total_messages: number;
+  consent_stats: {
+    granted: number;
+    pending: number;
+    denied: number;
+    revoked: number;
+  };
+  recent_activity: any[];
+  role_counts: Record<string, number>;
+}
+
+export interface AuditEntry {
+  id: string;
+  actor_id: string;
+  actor_name: string;
+  action: string;
+  target_student_id: string | null;
+  target_student_name: string | null;
+  details: any;
+  ip_address: string | null;
+  created_at: string;
+}
+
+export interface AdminUser {
+  id: string;
+  name_first: string;
+  name_last: string;
+  email: string;
+  role: string;
+  board_id: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export async function getAdminDashboard(): Promise<{ stats: AdminStats }> {
+  return request<{ stats: AdminStats }>('/api/admin/dashboard');
+}
+
+export async function getAdminAudit(params?: {
+  action?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ entries: AuditEntry[]; total: number }> {
+  const qs = new URLSearchParams();
+  if (params?.action) qs.set('action', params.action);
+  if (params?.limit) qs.set('limit', String(params.limit));
+  if (params?.offset) qs.set('offset', String(params.offset));
+  return request<{ entries: AuditEntry[]; total: number }>(`/api/admin/audit?${qs}`);
+}
+
+export async function getAdminUsers(params?: {
+  role?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ users: AdminUser[]; total: number }> {
+  const qs = new URLSearchParams();
+  if (params?.role) qs.set('role', params.role);
+  if (params?.search) qs.set('search', params.search);
+  if (params?.limit) qs.set('limit', String(params.limit));
+  if (params?.offset) qs.set('offset', String(params.offset));
+  return request<{ users: AdminUser[]; total: number }>(`/api/admin/users?${qs}`);
+}
