@@ -1095,8 +1095,22 @@ html, body, #root {
   margin-top: 12px;
 }
 
+/* Drawer backdrop — only visible on mobile */
+.drawer-backdrop {
+  display: none;
+}
+
 /* === Responsive === */
 @media (max-width: 640px) {
+  .drawer-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    background: rgba(0, 0, 0, 0.4);
+    -webkit-tap-highlight-color: transparent;
+  }
+
   .sidebar {
     position: fixed;
     top: 0;
@@ -1109,10 +1123,7 @@ html, body, #root {
     box-shadow: 4px 0 20px rgba(0,0,0,0.3);
   }
 
-  .chat-layout.sidebar-open .chat-main {
-    pointer-events: none;
-    opacity: 0.5;
-  }
+  /* backdrop handles dimming now */
 
   .header-role { display: none; }
 
@@ -1161,10 +1172,7 @@ html, body, #root {
     box-shadow: 4px 0 20px rgba(0,0,0,0.15);
   }
 
-  .staff-layout.selector-open .staff-main {
-    pointer-events: none;
-    opacity: 0.5;
-  }
+  /* backdrop handles dimming now */
 
   .tab { padding: 10px 14px; font-size: 13px; }
 

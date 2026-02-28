@@ -18,7 +18,8 @@ export default function StaffPortal() {
   const staff = useStaff();
   const chat = useChat();
   const [activeTab, setActiveTab] = useState<Tab>('chat');
-  const [selectorOpen, setSelectorOpen] = useState(true);
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 640;
+  const [selectorOpen, setSelectorOpen] = useState(!isMobile);
 
   function handleLogout() {
     logout();
@@ -27,8 +28,9 @@ export default function StaffPortal() {
 
   function handleSelectStudent(s: typeof staff.selectedStudent) {
     staff.setSelectedStudent(s);
-    // Reset chat when switching students
     chat.newChat();
+    // Auto-close sidebar on mobile after selecting
+    if (window.innerWidth <= 640) setSelectorOpen(false);
   }
 
   if (!user) return null;
@@ -36,6 +38,8 @@ export default function StaffPortal() {
   return (
     <div className={`staff-layout ${selectorOpen ? 'selector-open' : ''}`}>
       {selectorOpen && (
+        <>
+        <div className="drawer-backdrop" onClick={() => setSelectorOpen(false)} />
         <div className="staff-sidebar">
           <StudentSelector
             students={staff.students}
@@ -54,6 +58,7 @@ export default function StaffPortal() {
             <button className="btn-logout" onClick={handleLogout}>Sign Out</button>
           </div>
         </div>
+        </>
       )}
 
       <main className="staff-main">

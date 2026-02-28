@@ -22,6 +22,8 @@ export default function ChatPage() {
   return (
     <div className={`chat-layout ${sidebarOpen ? 'sidebar-open' : ''}`}>
       {sidebarOpen && (
+        <>
+        <div className="drawer-backdrop" onClick={() => setSidebarOpen(false)} />
         <SessionSidebar
           sessions={chat.sessions}
           activeSessionId={chat.activeSessionId}
@@ -40,6 +42,7 @@ export default function ChatPage() {
           userRole={user.role}
           onLogout={handleLogout}
         />
+        </>
       )}
 
       <main className="chat-main">
