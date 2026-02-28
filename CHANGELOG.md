@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.4.0] - 2026-02-28
+
+### Added
+- Student Chat UI: full React frontend with login, chat interface, and session management
+- Login page with email/password form and quick-login buttons for all 6 dev users
+- Chat interface with markdown rendering (react-markdown + remark-gfm), typing indicator, auto-scroll
+- Session sidebar: conversation history list, new chat, user info, sign out
+- Auth system: JWT token storage, AuthProvider context, protected routes
+- useChat hook: message state, optimistic updates, session loading, error handling
+- API client module with typed fetch wrapper and automatic 401 redirect
+- Responsive design: mobile sidebar overlay, collapsible header
+- Empty chat state with suggested prompts
+- Message metadata display (sources used, response latency)
+- react-router-dom, react-markdown, remark-gfm dependencies
+
 ## [0.3.0] - 2026-02-27
 
 ### Added
