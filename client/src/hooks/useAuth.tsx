@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import { login as apiLogin, getMe, setToken, clearToken, getToken, type UserInfo } from '../api/client.js';
+import type { UserInfo } from '../api/client.js';
+import { getClientAuthProvider } from '../auth/index.js';
 
 interface AuthState {
   user: UserInfo | null;
@@ -11,6 +12,8 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+const authProvider = getClientAuthProvider();
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -18,26 +21,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Check existing token on mount
   useEffect(() => {
-    const token = getToken();
+    const token = authProvider.getToken();
     if (!token) {
       setLoading(false);
       return;
     }
-    getMe()
-      .then(({ user }) => setUser(user))
-      .catch(() => clearToken())
+    authProvider.getUser()
+      .then((u) => setUser(u))
+      .catch(() => authProvider.logout())
       .finally(() => setLoading(false));
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     setError(null);
-    const res = await apiLogin(email, password);
-    setToken(res.token);
+    const res = await authProvider.login(email, password);
+    authProvider.setToken(res.token);
     setUser(res.user);
   }, []);
 
   const logout = useCallback(() => {
-    clearToken();
+    authProvider.logout();
     setUser(null);
   }, []);
 

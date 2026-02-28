@@ -3,8 +3,15 @@ import { z } from 'zod/v4';
 import { findUserByEmail } from '../db/queries/index.js';
 import { comparePassword, generateToken } from '../utils/crypto.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { getAuthProvider } from '../auth/index.js';
 
 const router = Router();
+
+// Auth provider info (public)
+router.get('/api/auth/provider', (_req, res) => {
+  const provider = getAuthProvider();
+  res.json({ provider: provider.name });
+});
 
 const loginSchema = z.object({
   email: z.email(),

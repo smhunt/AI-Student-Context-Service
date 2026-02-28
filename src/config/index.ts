@@ -7,6 +7,7 @@ export const config = {
   jwtSecret: process.env.JWT_SECRET || 'dev-jwt-secret-studentcontext-2026',
   corsOrigin: process.env.CORS_ORIGIN || 'https://dev.ecoworks.ca:3009',
   nodeEnv: process.env.NODE_ENV || 'development',
+  authProvider: process.env.AUTH_PROVIDER || 'dev',
   claudeApiKey: process.env.CLAUDE_API_KEY || '',
   claudeModel: process.env.CLAUDE_MODEL || 'claude-sonnet-4-20250514',
   chatMaxTokens: parseInt(process.env.CHAT_MAX_TOKENS || '2048', 10),

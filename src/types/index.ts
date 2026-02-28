@@ -214,7 +214,16 @@ export interface ChatMessage {
   created_at: Date;
 }
 
-// JWT payload
+// Authenticated user identity (provider-agnostic)
+export interface AuthUser {
+  userId: string;
+  role: UserRole;
+  boardId: string;
+  email?: string;
+  externalId?: string;
+}
+
+// JWT payload (legacy alias for auth internals)
 export interface JwtPayload {
   userId: string;
   role: UserRole;
@@ -225,7 +234,7 @@ export interface JwtPayload {
 declare global {
   namespace Express {
     interface Request {
-      user?: JwtPayload;
+      user?: AuthUser;
     }
   }
 }
