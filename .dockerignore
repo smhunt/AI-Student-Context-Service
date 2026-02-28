@@ -1,0 +1,8 @@
+node_modules
+client/node_modules
+.env
+.env.local
+*.md
+.git
+.claude
+docs

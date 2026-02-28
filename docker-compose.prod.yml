@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: always
+    environment:
+      POSTGRES_DB: studentcontext
+      POSTGRES_USER: sc_prod
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sc_prod"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    labels:
+      com.ecoworks.project: "studentcontext-ai"
+      com.ecoworks.environment: "production"
+
+  app:
+    build: .
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://sc_prod:${DB_PASSWORD}@db:5432/studentcontext
+      PORT: 3094
+      NODE_ENV: production
+      JWT_SECRET: ${JWT_SECRET}
+      CLAUDE_API_KEY: ${CLAUDE_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+    ports:
+      - "3094:3094"
+    labels:
+      com.ecoworks.project: "studentcontext-ai"
+      com.ecoworks.environment: "production"
+
+volumes:
+  pgdata:

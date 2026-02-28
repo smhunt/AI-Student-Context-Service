@@ -10,6 +10,25 @@ For API endpoint reference, see [docs/API.md](docs/API.md).
 
 ---
 
+## [0.6.0] - 2026-02-28
+
+Sprint 6 & 7: Consent & Admin Portal + Infrastructure Prep -- parent consent flows, admin dashboard, RLS, and production deployment config.
+
+### Added
+- **Parent Consent Portal**: parents can view children, grant/revoke AI context consent with granular data source selection
+- **Admin Dashboard**: board-wide statistics, audit log viewer with filters, user management
+- **Consent API routes**: `GET /api/consent/children`, `GET /api/consent/:studentId`, `POST /api/consent/grant`, `POST /api/consent/revoke`
+- **Admin API expansion**: `GET /api/admin/audit`, `GET /api/admin/dashboard`, `GET /api/admin/users`
+- **Row-Level Security (RLS) migration** (`007_row_level_security.sql`): PostgreSQL policies for multi-tenant board_id isolation as defense-in-depth; all 12 tenant-scoped tables protected
+- **Production Dockerfile**: multi-stage build (backend TypeScript compile, frontend Vite build, production runtime)
+- **Production Docker Compose** (`docker-compose.prod.yml`): pgvector database with health checks + app service with environment variable injection
+- **`.dockerignore`**: excludes node_modules, .env files, docs, and .git from Docker build context
+
+### Changed
+- Role-based routing updated: parents redirect to `/consent`, board admins to `/admin`
+
+---
+
 ## [0.5.0] - 2026-02-28
 
 Sprint 5: Staff Portal -- role-based tools for teachers, guidance counsellors, and school administrators.
