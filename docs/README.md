@@ -974,7 +974,7 @@ All development users share the password: `devpassword123`
 - Consent management UI with granular source selection
 
 ### Sprint 7: Pilot Prep -- PLANNED
-- SIS (Trillium) integration for report cards, transcripts, attendance, IEPs
+- SIS (Aspen/Follett) integration for report cards, transcripts, attendance, IEPs
 - SAML/OIDC SSO integration with school board identity providers
 - Security audit and penetration testing
 - FIPPA compliance review

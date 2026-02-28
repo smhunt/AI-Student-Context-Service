@@ -1,7 +1,7 @@
 /**
  * SIS (Student Information System) Mock Data
  *
- * Realistic Ontario student data following Trillium / OnSIS field formats.
+ * Realistic Ontario student data following Aspen (Follett) / OnSIS field formats.
  * TVDSB (Thames Valley District School Board) — Board code 66.
  *
  * Reference frameworks:

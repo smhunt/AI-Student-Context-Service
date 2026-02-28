@@ -43,7 +43,7 @@ StudentContext AI is a middleware SaaS that transforms school-board-approved LLM
    - **Context Engine** (`context-engine.ts`) — RAG pipeline: embed query → vector similarity search (scoped by permissions) → augment prompt → send to LLM
    - **Permission Service** (`permissions.ts`) — Role-based access control determining which students' data and sensitivity levels each user can access
    - **Consent Service** (`consent.ts`) — Verifies parental consent before any context retrieval
-   - **Ingestion Service** — Syncs from Google Classroom, SIS (Trillium), and assessment systems; chunks and embeds documents
+   - **Ingestion Service** — Syncs from Google Classroom, SIS (Aspen/Follett), and assessment systems; chunks and embeds documents
    - **LLM Adapter** (`llm-adapter.ts`) — Provider-agnostic wrapper (boards may mandate different LLMs)
    - **Audit Service** — Logs every context retrieval for compliance
 3. **Data Layer** — PostgreSQL + pgvector with multi-tenant isolation via `board_id` on all tables

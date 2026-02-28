@@ -43,7 +43,7 @@ Tech stack: TypeScript, Node.js, PostgreSQL + pgvector, React, Claude API (swapp
 │  ┌─────────────────┐  ┌──────────────────────────────┐   │
 │  │ Context Engine   │  │ Ingestion Service            │   │
 │  │ - retrieve()     │  │ - Google Classroom sync      │   │
-│  │ - augment()      │  │ - SIS (Trillium) sync       │   │
+│  │ - augment()      │  │ - SIS (Aspen) sync       │   │
 │  │ - rank()         │  │ - Assessment data sync       │   │
 │  └────────┬────────┘  │ - Chunker + Embedder         │   │
 │           │           └──────────────┬───────────────┘   │
@@ -125,7 +125,7 @@ CREATE TYPE user_role AS ENUM (
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     board_id UUID NOT NULL REFERENCES boards(id),
-    external_id TEXT,                            -- ID from SIS (Trillium student #)
+    external_id TEXT,                            -- ID from SIS (Aspen student #)
     email TEXT,
     name_first TEXT NOT NULL,
     name_last TEXT NOT NULL,
@@ -181,7 +181,7 @@ CREATE TABLE courses (
     subject TEXT,                                -- 'Mathematics'
     academic_year TEXT NOT NULL,
     semester TEXT,                                -- 'S1', 'S2', 'FY'
-    source TEXT NOT NULL,                        -- 'google_classroom', 'trillium'
+    source TEXT NOT NULL,                        -- 'google_classroom', 'aspen'
     metadata JSONB NOT NULL DEFAULT '{}',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -781,10 +781,10 @@ async function generateEmbedding(text: string): Promise<number[]> {
 }
 
 
-6.3 SIS Integration (Trillium/PowerSchool)
+6.3 SIS Integration (Aspen/PowerSchool)
 
 // src/ingestion/sis.ts
-// Note: Trillium API specifics will need to be confirmed with TVDSB IT
+// Note: Aspen API specifics will need to be confirmed with TVDSB IT
 // Most Ontario SIS systems support SIF (Schools Interoperability Framework) or REST APIs
 
 interface SISConfig {
@@ -897,7 +897,7 @@ studentcontext/
 │   │   └── audit.ts               // Audit logging
 │   ├── ingestion/
 │   │   ├── google-classroom.ts    // GC API sync
-│   │   ├── sis.ts                 // Trillium/PowerSchool sync
+│   │   ├── sis.ts                 // Aspen/PowerSchool sync
 │   │   ├── scheduler.ts           // Cron-based sync scheduling
 │   │   └── chunker.ts             // Text chunking logic
 │   ├── routes/
@@ -1030,7 +1030,7 @@ volumes:
 - CHECKPOINT: Full consent flow works, admin can monitor system
 
 ## Sprint 7: Pilot Prep (Week 13-14)
-- [ ] SIS integration (Trillium stub or real if API available)
+- [ ] SIS integration (Aspen stub or real if API available)
 - [ ] SSO integration (board's SAML/OIDC)
 - [ ] Security audit / pen test
 - [ ] FIPPA compliance documentation
