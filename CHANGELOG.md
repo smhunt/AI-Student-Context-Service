@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.0] - 2026-02-27
+
+### Added
+- Context Engine (RAG pipeline): embed query, vector search, permission-scoped augmentation, LLM chat
+- Permission Service: role-based access control for all 9 user roles
+- Consent Service: verifies parental consent before any context retrieval
+- LLM Adapter: provider-agnostic interface with Claude (Anthropic) implementation
+- Audit Service: logs every context retrieval and chat message for FIPPA compliance
+- Chat API routes: POST /api/chat/message, GET /api/chat/sessions, GET /api/chat/sessions/:id
+- Chat session management with multi-turn conversation support
+- Role-specific system prompt templates (student, teacher, guidance, principal, parent, supply, admin)
+- DB queries for consent verification, audit logging, chat sessions, staff-student scope resolution
+- Source filtering on vector similarity search for permission enforcement
+- @anthropic-ai/sdk dependency for Claude API integration
+
 ## [0.2.0] - 2026-02-27
 
 ### Added

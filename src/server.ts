@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { config } from './config/index.js';
-import { healthRouter, authRouter, adminRouter, webhooksRouter } from './routes/index.js';
+import { healthRouter, authRouter, adminRouter, webhooksRouter, chatRouter } from './routes/index.js';
 
 const app = express();
 
@@ -14,6 +14,7 @@ app.use(healthRouter);
 app.use(authRouter);
 app.use(adminRouter);
 app.use(webhooksRouter);
+app.use(chatRouter);
 
 app.listen(config.port, () => {
   console.log(`

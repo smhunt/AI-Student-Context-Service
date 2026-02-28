@@ -1,5 +1,5 @@
 import { query } from '../index.js';
-import type { Embedding, SensitivityLevel } from '../../types/index.js';
+import type { DocumentSource, Embedding, SensitivityLevel } from '../../types/index.js';
 
 export async function createEmbedding(embedding: {
   chunk_id: string;
@@ -45,6 +45,7 @@ export async function searchSimilar(
     maxSensitivity?: SensitivityLevel;
     limit?: number;
     threshold?: number;
+    sources?: DocumentSource[];
   }
 ): Promise<SimilarChunkResult[]> {
   const limit = opts?.limit ?? 5;
@@ -55,6 +56,15 @@ export async function searchSimilar(
   const sensitivityLevels: SensitivityLevel[] = ['standard'];
   if (opts?.maxSensitivity === 'sensitive') sensitivityLevels.push('sensitive');
   if (opts?.maxSensitivity === 'restricted') sensitivityLevels.push('sensitive', 'restricted');
+
+  // Optional source filter
+  const sourceFilter = opts?.sources && opts.sources.length > 0
+    ? 'AND d.source = ANY($6::document_source[])'
+    : '';
+  const params: unknown[] = [vectorStr, studentId, sensitivityLevels, threshold, limit];
+  if (opts?.sources && opts.sources.length > 0) {
+    params.push(opts.sources);
+  }
 
   const result = await query<SimilarChunkResult>(
     `SELECT
@@ -73,9 +83,10 @@ export async function searchSimilar(
      WHERE e.student_id = $2
        AND e.sensitivity = ANY($3::sensitivity_level[])
        AND (e.embedding <=> $1::vector) < $4
+       ${sourceFilter}
      ORDER BY e.embedding <=> $1::vector
      LIMIT $5`,
-    [vectorStr, studentId, sensitivityLevels, threshold, limit]
+    params
   );
   return result.rows;
 }
