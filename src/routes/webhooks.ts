@@ -29,4 +29,33 @@ router.post('/api/webhooks/google', async (req, res) => {
   res.status(200).send();
 });
 
+/**
+ * SIS webhook — receives change notifications from Aspen.
+ * Triggers incremental sync for the affected student.
+ */
+router.post('/api/webhooks/sis', async (req, res) => {
+  const { event_type, oen, board_id, student_id } = req.body;
+
+  if (!event_type || !oen) {
+    res.status(400).json({ error: 'Missing event_type or oen' });
+    return;
+  }
+
+  console.log(`[SIS Webhook] ${event_type} for OEN ${oen}`);
+
+  // Trigger incremental sync if we have enough info
+  if (board_id && student_id) {
+    try {
+      const { syncStudent } = await import('../ingestion/sis-sync.js');
+      const result = await syncStudent(oen, board_id, student_id);
+      res.json({ accepted: true, sync_result: result });
+      return;
+    } catch (err) {
+      console.error('[SIS Webhook] Sync error:', err);
+    }
+  }
+
+  res.json({ accepted: true, message: 'Notification received' });
+});
+
 export default router;

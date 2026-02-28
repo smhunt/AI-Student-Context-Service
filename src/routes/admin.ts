@@ -390,6 +390,50 @@ router.get('/api/admin/users', authMiddleware, async (req, res) => {
   });
 });
 
+// SIS sync — trigger student sync via SIS provider
+const sisSyncSchema = z.object({
+  student_id: z.string().uuid(),
+  oen: z.string().regex(/^\d{9}$/),
+});
+
+router.post('/api/admin/sis/sync', authMiddleware, async (req, res) => {
+  if (!requireAdmin(req)) {
+    res.status(403).json({ error: 'Admin access required' });
+    return;
+  }
+
+  const parsed = sisSyncSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid request', details: parsed.error.issues });
+    return;
+  }
+
+  try {
+    const { syncStudent } = await import('../ingestion/sis-sync.js');
+    const result = await syncStudent(
+      parsed.data.oen,
+      req.user!.boardId,
+      parsed.data.student_id,
+    );
+    res.json(result);
+  } catch (err) {
+    console.error('SIS sync error:', err);
+    res.status(500).json({ error: 'SIS sync failed', message: (err as Error).message });
+  }
+});
+
+// SIS provider status
+router.get('/api/admin/sis/status', authMiddleware, async (req, res) => {
+  if (!requireAdmin(req)) {
+    res.status(403).json({ error: 'Admin access required' });
+    return;
+  }
+
+  const { createSISProvider } = await import('../ingestion/sis/index.js');
+  const provider = createSISProvider();
+  res.json({ provider: provider.name, configured: true });
+});
+
 // Token usage & billing stats
 router.get('/api/admin/usage', authMiddleware, async (req, res) => {
   if (!requireAdmin(req)) {

@@ -24,6 +24,11 @@ export const config = {
   mistralModel: process.env.MISTRAL_MODEL || 'mistral-large-latest',
   openaiApiKey: process.env.OPENAI_API_KEY || '',
   embeddingModel: 'text-embedding-3-small',
+  // SIS Provider
+  sisProvider: process.env.SIS_PROVIDER || 'mock',
+  aspenBaseUrl: process.env.ASPEN_BASE_URL || '',
+  aspenClientId: process.env.ASPEN_CLIENT_ID || '',
+  aspenClientSecret: process.env.ASPEN_CLIENT_SECRET || '',
   googleClientId: process.env.GOOGLE_CLIENT_ID || '',
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
   googleRedirectUri: process.env.GOOGLE_REDIRECT_URI || 'https://dev.ecoworks.ca:3094/api/auth/google/callback',
