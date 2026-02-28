@@ -369,6 +369,62 @@ html, body, #root {
   border-top: 1px solid var(--border);
 }
 
+/* Message actions (speech + meta) */
+.message-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.message-meta-inline {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.speech-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.btn-speech {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  padding: 0;
+}
+
+.btn-speech:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-light);
+}
+
+.btn-speech.active {
+  border-color: var(--primary);
+  color: white;
+  background: var(--primary);
+}
+
+.btn-speech.active:hover {
+  background: var(--primary-hover);
+}
+
+.btn-speech:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 /* Typing indicator */
 .typing-indicator {
   display: flex;
