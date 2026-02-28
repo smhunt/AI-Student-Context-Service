@@ -390,4 +390,15 @@ router.get('/api/admin/users', authMiddleware, async (req, res) => {
   });
 });
 
+// LLM provider listing — shows which providers are configured
+router.get('/api/admin/llm-providers', authMiddleware, async (req, res) => {
+  if (!requireAdmin(req)) {
+    res.status(403).json({ error: 'Admin access required' });
+    return;
+  }
+
+  const { getAvailableProviders } = await import('../services/llm-adapter.js');
+  res.json({ providers: getAvailableProviders() });
+});
+
 export default router;
