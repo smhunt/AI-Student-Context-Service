@@ -8,6 +8,8 @@ export const config = {
   corsOrigin: process.env.CORS_ORIGIN || 'https://dev.ecoworks.ca:3009',
   nodeEnv: process.env.NODE_ENV || 'development',
   authProvider: process.env.AUTH_PROVIDER || 'dev',
+  clerkPublishableKey: process.env.CLERK_PUBLISHABLE_KEY || '',
+  clerkSecretKey: process.env.CLERK_SECRET_KEY || '',
   claudeApiKey: process.env.CLAUDE_API_KEY || '',
   claudeModel: process.env.CLAUDE_MODEL || 'claude-sonnet-4-20250514',
   chatMaxTokens: parseInt(process.env.CHAT_MAX_TOKENS || '2048', 10),
@@ -32,4 +34,19 @@ export const config = {
   googleClientId: process.env.GOOGLE_CLIENT_ID || '',
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
   googleRedirectUri: process.env.GOOGLE_REDIRECT_URI || 'https://dev.ecoworks.ca:3094/api/auth/google/callback',
+  // Entra ID (Azure AD) auth
+  entraTenantId: process.env.ENTRA_TENANT_ID || '',
+  entraClientId: process.env.ENTRA_CLIENT_ID || '',
+  // Google Identity auth (separate from Classroom OAuth)
+  googleAuthClientId: process.env.GOOGLE_AUTH_CLIENT_ID || '',
+  // Clerk webhook
+  clerkWebhookSecret: process.env.CLERK_WEBHOOK_SECRET || '',
+  // MCP HTTP transport
+  mcpHttpPort: parseInt(process.env.MCP_HTTP_PORT || '3095', 10),
+  mcpHttpEnabled: process.env.MCP_HTTP_ENABLED === 'true',
+  // OneRoster SIS
+  sisProtocol: process.env.SIS_PROTOCOL || 'rest',
+  onerosterBaseUrl: process.env.ONEROSTER_BASE_URL || '',
+  onerosterClientId: process.env.ONEROSTER_CLIENT_ID || '',
+  onerosterClientSecret: process.env.ONEROSTER_CLIENT_SECRET || '',
 } as const;
