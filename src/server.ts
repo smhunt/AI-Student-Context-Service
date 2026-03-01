@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from './config/index.js';
-import { healthRouter, authRouter, adminRouter, webhooksRouter, chatRouter, staffRouter, consentRouter } from './routes/index.js';
+import { healthRouter, authRouter, adminRouter, webhooksRouter, chatRouter, staffRouter, consentRouter, openaiCompatRouter } from './routes/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -23,6 +23,7 @@ app.use(webhooksRouter);
 app.use(chatRouter);
 app.use(staffRouter);
 app.use(consentRouter);
+app.use(openaiCompatRouter);
 
 const certsDir = path.resolve(__dirname, '..', '..', '.shared-certs');
 const sslOpts = {
