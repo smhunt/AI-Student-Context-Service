@@ -34,8 +34,16 @@ router.post('/api/webhooks/google', async (req, res) => {
 });
 
 /**
- * SIS webhook — receives change notifications from Aspen.
- * Triggers incremental sync for the affected student.
+ * SIS webhook — receives change notifications from Aspen or OneRoster-compliant SIS.
+ *
+ * Supported event types:
+ *  - student.updated: Re-sync all data for the student
+ *  - reportcard.created / reportcard.updated: Re-sync report cards
+ *  - enrollment.created / enrollment.updated: Re-sync student enrollment
+ *  - attendance.updated: Re-sync attendance records
+ *
+ * Identifies the student by OEN. If board_id and student_id are provided,
+ * skips the lookup step. Otherwise, looks up the student by OEN.
  */
 router.post('/api/webhooks/sis', async (req, res) => {
   const { event_type, oen, board_id, student_id } = req.body;
@@ -47,19 +55,40 @@ router.post('/api/webhooks/sis', async (req, res) => {
 
   console.log(`[SIS Webhook] ${event_type} for OEN ${oen}`);
 
-  // Trigger incremental sync if we have enough info
-  if (board_id && student_id) {
+  let resolvedBoardId = board_id;
+  let resolvedStudentId = student_id;
+
+  // If we don't have board_id and student_id, look up by OEN
+  if (!resolvedBoardId || !resolvedStudentId) {
     try {
-      const { syncStudent } = await import('../ingestion/sis-sync.js');
-      const result = await syncStudent(oen, board_id, student_id);
-      res.json({ accepted: true, sync_result: result });
-      return;
+      const result = await query(
+        `SELECT id, board_id FROM users WHERE
+         (external_id = $1 OR metadata->>'oen' = $1) AND role = 'student' LIMIT 1`,
+        [oen]
+      );
+      if (result.rows.length > 0) {
+        resolvedStudentId = result.rows[0].id;
+        resolvedBoardId = result.rows[0].board_id;
+      }
     } catch (err) {
-      console.error('[SIS Webhook] Sync error:', err);
+      console.error('[SIS Webhook] OEN lookup error:', err);
     }
   }
 
-  res.json({ accepted: true, message: 'Notification received' });
+  if (resolvedBoardId && resolvedStudentId) {
+    try {
+      const { syncStudent } = await import('../ingestion/sis-sync.js');
+      const result = await syncStudent(oen, resolvedBoardId, resolvedStudentId);
+      res.json({ accepted: true, event_type, oen, sync_result: result });
+      return;
+    } catch (err) {
+      console.error('[SIS Webhook] Sync error:', err);
+      res.json({ accepted: true, event_type, oen, error: (err as Error).message });
+      return;
+    }
+  }
+
+  res.json({ accepted: true, event_type, oen, message: 'Student not found in database — notification logged' });
 });
 
 /**

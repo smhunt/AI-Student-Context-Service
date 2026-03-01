@@ -131,6 +131,114 @@ export async function syncStudent(
   return result;
 }
 
+/**
+ * Batch sync for an entire school — fetches all students and syncs each.
+ * Uses concurrency limiting to avoid overwhelming the SIS API.
+ */
+export async function syncSchool(
+  schoolCode: string,
+  boardId: string,
+  options?: {
+    concurrency?: number;
+    onProgress?: (completed: number, total: number) => void;
+    provider?: SISProvider;
+  }
+): Promise<SyncResult & { students_found: number }> {
+  const sis = options?.provider || createSISProvider();
+  const concurrency = options?.concurrency ?? 5;
+
+  const students = await sis.getSchoolStudents(schoolCode);
+
+  const result: SyncResult & { students_found: number } = {
+    students_found: students.length,
+    students_processed: 0,
+    documents_created: 0,
+    documents_skipped: 0,
+    errors: [],
+  };
+
+  if (students.length === 0) return result;
+
+  // Look up student IDs in our database by OEN
+  const { query: dbQuery } = await import('../db/index.js');
+
+  // Process in batches of `concurrency`
+  for (let i = 0; i < students.length; i += concurrency) {
+    const batch = students.slice(i, i + concurrency);
+    const batchPromises = batch.map(async (student) => {
+      try {
+        // Find the student in our database by OEN (stored in external_id or metadata)
+        const dbResult = await dbQuery(
+          `SELECT id FROM users WHERE board_id = $1 AND
+           (external_id = $2 OR metadata->>'oen' = $2) AND role = 'student' LIMIT 1`,
+          [boardId, student.oen]
+        );
+
+        if (dbResult.rows.length === 0) {
+          result.errors.push(`Student OEN ${student.oen} not found in database`);
+          return;
+        }
+
+        const studentId = dbResult.rows[0].id;
+        const syncResult = await syncStudent(student.oen, boardId, studentId, sis);
+        result.documents_created += syncResult.documents_created;
+        result.documents_skipped += syncResult.documents_skipped;
+        result.errors.push(...syncResult.errors);
+        result.students_processed++;
+      } catch (err) {
+        result.errors.push(`${student.oen}: ${(err as Error).message}`);
+      }
+    });
+
+    await Promise.all(batchPromises);
+    options?.onProgress?.(Math.min(i + concurrency, students.length), students.length);
+  }
+
+  return result;
+}
+
+/**
+ * Batch sync for an entire board — syncs all schools.
+ */
+export async function syncBoard(
+  boardId: string,
+  schoolCodes: string[],
+  options?: {
+    concurrency?: number;
+    onProgress?: (school: string, completed: number, total: number) => void;
+    provider?: SISProvider;
+  }
+): Promise<SyncResult & { schools_processed: number; students_found: number }> {
+  const result = {
+    schools_processed: 0,
+    students_found: 0,
+    students_processed: 0,
+    documents_created: 0,
+    documents_skipped: 0,
+    errors: [] as string[],
+  };
+
+  for (const schoolCode of schoolCodes) {
+    try {
+      const schoolResult = await syncSchool(schoolCode, boardId, {
+        concurrency: options?.concurrency,
+        provider: options?.provider,
+      });
+      result.schools_processed++;
+      result.students_found += schoolResult.students_found;
+      result.students_processed += schoolResult.students_processed;
+      result.documents_created += schoolResult.documents_created;
+      result.documents_skipped += schoolResult.documents_skipped;
+      result.errors.push(...schoolResult.errors);
+    } catch (err) {
+      result.errors.push(`School ${schoolCode}: ${(err as Error).message}`);
+    }
+    options?.onProgress?.(schoolCode, result.schools_processed, schoolCodes.length);
+  }
+
+  return result;
+}
+
 async function safeIngest(params: {
   student_id: string;
   board_id: string;

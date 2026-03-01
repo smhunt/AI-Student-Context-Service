@@ -434,6 +434,38 @@ router.get('/api/admin/sis/status', authMiddleware, async (req, res) => {
   res.json({ provider: provider.name, configured: true });
 });
 
+// SIS batch sync — school-level sync
+const batchSyncSchema = z.object({
+  school_code: z.string().min(1),
+  concurrency: z.number().int().min(1).max(10).optional(),
+});
+
+router.post('/api/admin/sis/sync/school', authMiddleware, async (req, res) => {
+  if (!requireAdmin(req)) {
+    res.status(403).json({ error: 'Admin access required' });
+    return;
+  }
+
+  const parsed = batchSyncSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid request', details: parsed.error.issues });
+    return;
+  }
+
+  try {
+    const { syncSchool } = await import('../ingestion/sis-sync.js');
+    const result = await syncSchool(
+      parsed.data.school_code,
+      req.user!.boardId,
+      { concurrency: parsed.data.concurrency },
+    );
+    res.json(result);
+  } catch (err) {
+    console.error('SIS batch sync error:', err);
+    res.status(500).json({ error: 'Batch sync failed', message: (err as Error).message });
+  }
+});
+
 // Token usage & billing stats
 router.get('/api/admin/usage', authMiddleware, async (req, res) => {
   if (!requireAdmin(req)) {
