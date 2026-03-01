@@ -10,6 +10,7 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:reset": "tsx src/db/reset.ts",
+    "seed:large": "tsx src/db/seed-large.ts",
     "mcp": "tsx src/mcp/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
