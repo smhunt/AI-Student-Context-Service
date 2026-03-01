@@ -458,4 +458,84 @@ router.get('/api/admin/llm-providers', authMiddleware, async (req, res) => {
   res.json({ providers: getAvailableProviders() });
 });
 
+// === Billing Routes (Sprint 14) ===
+
+// Current month billing
+router.get('/api/admin/billing', authMiddleware, async (req, res) => {
+  if (!requireAdmin(req)) {
+    res.status(403).json({ error: 'Admin access required' });
+    return;
+  }
+
+  const { getBoardLLMConfig, getCurrentPeriodUsage } = await import('../db/queries/billing.js');
+  const [config, usage] = await Promise.all([
+    getBoardLLMConfig(req.user!.boardId),
+    getCurrentPeriodUsage(req.user!.boardId),
+  ]);
+
+  res.json({
+    billing_plan: config?.billing_plan ?? 'pilot',
+    markup_multiplier: config?.markup_multiplier ?? 1.5,
+    limits: {
+      monthly_token_limit: config?.monthly_token_limit ?? null,
+      monthly_cost_limit_usd: config?.monthly_cost_limit_usd ?? null,
+    },
+    current_period: {
+      ...usage,
+      token_pct: config?.monthly_token_limit
+        ? Math.round((usage.total_tokens / config.monthly_token_limit) * 100)
+        : null,
+      cost_pct: config?.monthly_cost_limit_usd
+        ? Math.round((usage.total_billed_usd / config.monthly_cost_limit_usd) * 100)
+        : null,
+    },
+    allowed_providers: config?.allowed_providers ?? [],
+    preferred_provider: config?.preferred_provider ?? 'claude',
+  });
+});
+
+// Billing history (12 months)
+router.get('/api/admin/billing/history', authMiddleware, async (req, res) => {
+  if (!requireAdmin(req)) {
+    res.status(403).json({ error: 'Admin access required' });
+    return;
+  }
+
+  const months = Math.min(parseInt(req.query.months as string) || 12, 24);
+  const { getBillingHistory } = await import('../db/queries/billing.js');
+  const history = await getBillingHistory(req.user!.boardId, months);
+  res.json({ history });
+});
+
+// Update billing config (super-admin only)
+const SUPER_ADMIN_ROLES: UserRole[] = ['board_admin'];
+
+router.put('/api/admin/billing/config', authMiddleware, async (req, res) => {
+  if (!req.user || !SUPER_ADMIN_ROLES.includes(req.user.role)) {
+    res.status(403).json({ error: 'Board admin access required' });
+    return;
+  }
+
+  const updateSchema = z.object({
+    allowed_providers: z.array(z.string()).optional(),
+    preferred_provider: z.string().optional(),
+    monthly_token_limit: z.number().int().positive().optional(),
+    monthly_cost_limit_usd: z.number().positive().optional(),
+    markup_multiplier: z.number().min(1).max(5).optional(),
+    billing_plan: z.enum(['pilot', 'standard', 'enterprise']).optional(),
+    rate_limit_rpm: z.number().int().positive().optional(),
+    notes: z.string().optional(),
+  });
+
+  const parsed = updateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid request', details: parsed.error.issues });
+    return;
+  }
+
+  const { upsertBoardLLMConfig } = await import('../db/queries/billing.js');
+  const updated = await upsertBoardLLMConfig(req.user.boardId, parsed.data);
+  res.json({ config: updated });
+});
+
 export default router;

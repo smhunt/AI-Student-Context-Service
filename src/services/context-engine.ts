@@ -8,8 +8,8 @@ import { resolvePermissionScope } from './permissions.js';
 import { verifyConsent } from './consent.js';
 import { logContextRetrieval, logChatMessage } from './audit.js';
 import { generateEmbedding } from './embedder.js';
-import { createLLMProvider, type LLMMessage, type LLMResponse } from './llm-adapter.js';
-import { createGateway } from './llm-gateway.js';
+import { type LLMMessage, type LLMResponse } from './llm-adapter.js';
+import { getBroker, BillingLimitError } from './api-key-broker.js';
 import { config } from '../config/index.js';
 import type { UserRole } from '../types/index.js';
 
@@ -143,9 +143,9 @@ export async function handleChatMessage(req: ContextRequest): Promise<ContextRes
     { role: 'user', content: req.query },
   ];
 
-  // 10. Call LLM via gateway (with token tracking)
-  const gateway = createGateway(config.llmProvider);
-  const llmResponse = await gateway.chat(messages, {
+  // 10. Call LLM via broker (with billing + token tracking)
+  const broker = getBroker();
+  const llmResponse = await broker.chat(messages, {
     boardId: req.boardId,
     userId: req.userId,
     sessionId,
@@ -286,10 +286,10 @@ export async function* handleChatMessageStream(req: ContextRequest): AsyncGenera
     { role: 'user', content: req.query },
   ];
 
-  const gateway = createGateway(config.llmProvider);
-  const gatewayOpts = { boardId: req.boardId, userId: req.userId, sessionId };
+  const broker = getBroker();
+  const brokerOpts = { boardId: req.boardId, userId: req.userId, sessionId };
 
-  const stream = gateway.chatStream(messages, gatewayOpts);
+  const stream = broker.chatStream(messages, brokerOpts);
   let llmResponse: LLMResponse | undefined;
 
   {
