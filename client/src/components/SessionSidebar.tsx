@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import type { ChatSession } from '../api/client.js';
+import { ChangelogModal } from './changelog-modal.js';
 
 interface Props {
   sessions: ChatSession[];
@@ -82,7 +83,10 @@ export default function SessionSidebar({
           <span className="user-name">{userName}</span>
           <span className="user-role">{ROLE_LABELS[userRole] ?? userRole}</span>
         </div>
-        <button className="btn-logout" onClick={onLogout}>Sign Out</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between' }}>
+          <ChangelogModal />
+          <button className="btn-logout" onClick={onLogout}>Sign Out</button>
+        </div>
       </div>
     </aside>
   );

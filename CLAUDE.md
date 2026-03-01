@@ -16,8 +16,10 @@ StudentContext AI is a middleware SaaS that transforms school-board-approved LLM
 - **Frontend:** React (Vite)
 - **Database:** PostgreSQL 16 + pgvector extension
 - **Embeddings:** OpenAI `text-embedding-3-small` (1536 dimensions)
-- **Chat LLM:** Claude API (swappable via LLM adapter pattern — supports OpenAI, Gemini, Copilot)
-- **Auth:** SSO (SAML/OIDC) for boards, JWT sessions
+- **Chat LLM:** LLM Gateway (Claude, OpenAI GPT-4o, Gemini, Llama/Groq, Mistral) with token tracking
+- **Auth:** AuthProvider abstraction (dev-login, with Clerk/Entra/Google pluggable)
+- **MCP:** Model Context Protocol server for Claude Desktop integration
+- **SIS:** SISProvider abstraction (Mock, Aspen/Follett with OAuth 2.0)
 - **Containerization:** Docker Compose (pgvector/pgvector:pg16 image)
 
 ## Port Assignments (registered in ~/.claude/PORTS.md)
@@ -82,25 +84,35 @@ These PostgreSQL enums are defined in the schema — use them consistently:
 - `sensitivity_level`: standard, sensitive, restricted
 - `consent_status`: pending, granted, denied, revoked
 
-## Planned Project Structure
+## Project Structure
 
 ```
 src/
   server.ts              # Express entry point
   config/                # Env-based config, DB pool, LLM configs
+  auth/                  # AuthProvider interface, DevAuthProvider, factory
+  mcp/                   # MCP server (tools, resources, stdio transport)
   db/
-    migrations/          # SQL migration files
-    queries/             # Typed query functions
-  services/              # Context engine, permissions, consent, embedder, LLM adapter, audit
-  ingestion/             # Google Classroom sync, SIS sync, chunker, scheduler
+    migrations/          # SQL migration files (001-009)
+    queries/             # Typed query functions (audit, consent, token-usage)
+  services/              # Context engine, permissions, consent, embedder, LLM gateway, audit
+  ingestion/
+    sis/                 # SISProvider interface, MockSIS, AspenSIS, factory
+    google-classroom.ts  # Google Classroom OAuth + sync
+    sis-sync.ts          # Student data sync service
+    pipeline.ts          # Ingestion pipeline (dedup, chunk, embed)
   routes/                # chat, auth, consent, staff, admin, webhooks
-  middleware/            # Auth (JWT), RBAC guards, rate limiting
+  middleware/            # Auth (JWT via AuthProvider), RBAC guards
   utils/                 # Crypto, validators
-client/                  # React frontend (Vite)
+client/                  # React frontend (Vite + Tailwind)
   src/
     pages/               # StudentChat, StaffPortal, ParentConsent, AdminDashboard
-    components/          # ChatInterface, StudentSelector, ConsentForm, InsightCard
-    hooks/               # useChat, useAuth
+    components/          # Chat components, StudentSelector, ChangelogModal
+    components/ui/       # shadcn/ui primitives (Button, Card, Dialog, Tabs, etc.)
+    auth/                # ClientAuthProvider, DevAuthClient, factory
+    hooks/               # useChat, useAuth, useAdmin, useStaff, useSpeech
+    lib/                 # Utilities (cn)
+docs/                    # README.md, API.md, MCP.md
 docker-compose.yml       # PostgreSQL + pgvector + app
 ```
 
@@ -108,9 +120,11 @@ docker-compose.yml       # PostgreSQL + pgvector + app
 
 ```
 POST /api/chat/message         # Context-augmented chat
+POST /api/chat/message/stream  # Streaming SSE chat
 GET  /api/chat/sessions        # User's chat sessions
-GET  /api/auth/sso             # Board SSO redirect
+GET  /api/auth/dev-login       # Dev-mode email/password login
 GET  /api/auth/me              # Current user + permissions
+GET  /api/auth/provider        # Active auth provider name
 GET  /api/consent/:studentId   # Consent status
 POST /api/consent/grant        # Parent grants consent
 POST /api/consent/revoke       # Parent revokes consent
@@ -118,6 +132,10 @@ GET  /api/staff/students       # Students in teacher's scope
 POST /api/staff/report-comments # Generate report card comments
 POST /api/admin/sync/trigger   # Manual data sync
 GET  /api/admin/audit          # Audit log queries
+POST /api/admin/sis/sync       # Trigger Aspen SIS sync
+GET  /api/admin/sis/status     # SIS provider status
+GET  /api/admin/usage          # LLM token usage/billing stats
+GET  /api/admin/llm-providers  # Configured LLM providers
 POST /api/webhooks/google      # Google Classroom push notifications
 POST /api/webhooks/sis         # SIS data change notifications
 ```
@@ -142,11 +160,16 @@ NODE_ENV=development
 
 ## Build Sprint Order
 
-The spec defines 7 sprints. Follow this order — each builds on the previous:
+All 12 sprints complete:
 1. **Foundation** — Scaffolding, Docker/DB setup, migrations, basic auth, seed data
 2. **Ingestion Pipeline** — Google Classroom OAuth, sync, chunking, embedding pipeline
 3. **Context Engine** — Vector search, permissions, consent, prompt augmentation, Claude chat
 4. **Student Chat UI** — React chat interface, auth flow, streaming, mobile-responsive
 5. **Staff Portal** — Role detection, student selector, report card comments, class insights
 6. **Consent & Admin** — Parent portal, consent flows, admin dashboard, audit viewer
-7. **Pilot Prep** — SIS integration, SSO, security audit, FIPPA compliance, Canadian hosting
+7. **Infrastructure** — RLS migration, Dockerfile, production compose, multi-LLM support
+8. **Auth Abstraction** — AuthProvider interface, Trillium→Aspen rename
+9. **MCP + Streaming** — MCP server for Claude Desktop, chat streaming with SSE
+10. **LLM Gateway** — Token tracking, pricing tables, billing stats
+11. **Aspen SIS** — SISProvider interface, mock + real Aspen client, sync service
+12. **UI Polish** — shadcn/ui design system, Tailwind, changelog modal, documentation

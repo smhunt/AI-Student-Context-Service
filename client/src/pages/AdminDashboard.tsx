@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 import { useAdmin, type AdminTab } from '../hooks/useAdmin.js';
 import { getRoleLabel } from '../utils/roles.js';
+import { ChangelogModal } from '../components/changelog-modal.js';
+import { useTheme } from '../components/ui/theme-provider.js';
+import { Moon, Sun } from 'lucide-react';
 
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
@@ -102,6 +105,8 @@ export default function AdminDashboard() {
 
   if (!user) return null;
 
+  const { theme, setTheme, resolvedTheme } = useTheme();
+
   const { stats } = admin;
   const consentTotal = stats
     ? stats.consent_stats.granted + stats.consent_stats.pending + stats.consent_stats.denied + stats.consent_stats.revoked
@@ -116,6 +121,15 @@ export default function AdminDashboard() {
           <p className="admin-subtitle">StudentContext AI - Board Administration</p>
         </div>
         <div className="admin-header-right">
+          <ChangelogModal />
+          <button
+            className="btn-icon"
+            onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+            title={`Switch to ${resolvedTheme === 'dark' ? 'light' : 'dark'} mode`}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: 'inherit' }}
+          >
+            {resolvedTheme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
           <span className="consent-user-info">
             {user.name_first} {user.name_last}
             <span className="consent-user-role">{getRoleLabel(user.role)}</span>

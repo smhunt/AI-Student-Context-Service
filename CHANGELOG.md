@@ -10,6 +10,89 @@ For API endpoint reference, see [docs/API.md](docs/API.md).
 
 ---
 
+## [0.12.0] - 2026-02-28
+
+Sprint 12: Chat UI polish + Documentation -- shadcn/ui design system, theme support, and in-app documentation.
+
+### Added
+- **shadcn/ui design system** with Tailwind CSS integration
+- **UI primitive components**: Button, Card, Dialog, Tabs, Avatar, Tooltip, Badge
+- **In-app Changelog modal** with tabs: Changelog, How It Works, Roadmap
+- **Dark/light theme support** via ThemeProvider
+- **Lucide React icons** replacing inline SVGs throughout the app
+- **Comprehensive MCP server documentation** (`docs/MCP.md`)
+
+### Changed
+- Updated all page components with shadcn/ui styling and consistent design tokens
+
+---
+
+## [0.11.0] - 2026-02-28
+
+Sprint 11: Aspen SIS real integration -- provider abstraction for Student Information Systems with live Aspen (Follett) support.
+
+### Added
+- **SISProvider interface** with 8 methods: getStudent, getReportCards, getTranscript, getAttendance, getIEP, getEQAO, getCourseRoster, getSchoolStudents
+- **MockSISProvider** wrapping existing `mock-data.ts` for development
+- **AspenSISProvider** with OAuth 2.0 client credentials, automatic token refresh, and retry logic
+- **Provider factory** reading `SIS_PROVIDER` env var (`mock` or `aspen`)
+- **syncStudent() service** for full data sync: pulls all SIS data, formats into prose, and feeds into the embedding pipeline
+- **Admin SIS endpoints**: `POST /api/admin/sis/sync` (trigger sync), `GET /api/admin/sis/status` (sync status)
+- **SIS webhook handler** for incremental sync on data changes
+- **Migration 009**: adds `sis_provider` and `sis_config` columns to boards table
+
+---
+
+## [0.10.0] - 2026-02-28
+
+Sprint 10: LLM Gateway with token tracking -- centralized LLM access with per-request cost accounting.
+
+### Added
+- **LLMGateway class** wrapping all 5 providers (Claude, OpenAI, Gemini, Groq, Mistral) with automatic token tracking
+- **Token usage table** (migration 008) storing provider, model, input/output tokens, and cost estimate per request
+- **Pricing tables** for Claude, OpenAI, Gemini, Groq, and Mistral models
+- **`GET /api/admin/usage` endpoint** for board-level billing stats with date range filtering
+- **Per-provider and per-model aggregation queries** for usage analytics
+
+### Changed
+- Context engine and staff routes now use LLMGateway for all LLM calls instead of direct adapter access
+
+---
+
+## [0.9.0] - 2026-02-28
+
+Sprint 9: MCP Server + Chat Streaming -- Model Context Protocol integration and Server-Sent Events for real-time responses.
+
+### Added
+- **MCP server** exposing Context Engine via Model Context Protocol
+  - Tools: `search_student_context`, `get_permission_scope`, `check_consent`, `ingest_document`
+  - Resources: student context, audit logs, session history
+  - Stdio transport for Claude Desktop integration
+- **Chat streaming** with Server-Sent Events (SSE)
+  - `AsyncGenerator chatStream()` on all LLM providers (Claude, OpenAI, Groq)
+  - `POST /api/chat/message/stream` SSE endpoint
+  - Progressive content rendering in client
+  - Streaming state management in `useChat` hook
+
+---
+
+## [0.8.0] - 2026-02-28
+
+Sprint 8: Auth abstraction + Aspen rename -- pluggable authentication and SIS naming alignment.
+
+### Added
+- **AuthProvider interface** with factory pattern (backend + client)
+  - `DevAuthProvider` wrapping existing JWT/bcrypt auth
+  - `ClientAuthProvider` for frontend auth abstraction
+  - `GET /api/auth/provider` endpoint returning the active auth provider name
+  - `AUTH_PROVIDER` env var (currently: `dev`, future: `clerk`, `entra`, `google`)
+- **Multi-LLM provider support** enhancement
+
+### Changed
+- Renamed all Trillium SIS references to **Aspen (Follett)** throughout the codebase
+
+---
+
 ## [0.6.0] - 2026-02-28
 
 Sprint 6 & 7: Consent & Admin Portal + Infrastructure Prep -- parent consent flows, admin dashboard, RLS, and production deployment config.

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
+import { ChangelogModal, APP_VERSION } from '../components/changelog-modal.js';
 
 const DEMO_USERS = [
   { email: 'alex.johnson@tvdsb.on.ca', label: 'Alex Johnson', role: 'Student' },
@@ -102,7 +103,10 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="version-tag">v0.4.0 — EcoWorks Web Architecture Inc.</p>
+        <div className="version-tag" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+          <ChangelogModal />
+          <span>— EcoWorks Web Architecture Inc.</span>
+        </div>
       </div>
     </div>
   );

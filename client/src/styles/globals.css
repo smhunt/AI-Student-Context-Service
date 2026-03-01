@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+/* === Design Tokens (CSS Custom Properties) === */
+@theme {
+  --color-background: #f8f9fa;
+  --color-surface: #ffffff;
+  --color-border: #e2e8f0;
+  --color-input: #f1f5f9;
+  --color-ring: #2563eb;
+
+  --color-foreground: #1a202c;
+  --color-muted: #64748b;
+  --color-muted-foreground: #94a3b8;
+
+  --color-primary: #2563eb;
+  --color-primary-foreground: #ffffff;
+  --color-primary-hover: #1d4ed8;
+
+  --color-secondary: #f1f5f9;
+  --color-secondary-foreground: #1e293b;
+
+  --color-accent: #059669;
+  --color-accent-foreground: #ffffff;
+
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #ffffff;
+
+  --color-sidebar: #1e293b;
+  --color-sidebar-foreground: #e2e8f0;
+  --color-sidebar-hover: #334155;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+
+/* Dark mode overrides */
+.dark {
+  --color-background: #0f172a;
+  --color-surface: #1e293b;
+  --color-border: #334155;
+  --color-input: #1e293b;
+  --color-foreground: #f1f5f9;
+  --color-muted: #94a3b8;
+  --color-muted-foreground: #64748b;
+  --color-primary: #3b82f6;
+  --color-primary-hover: #2563eb;
+  --color-secondary: #334155;
+  --color-secondary-foreground: #f1f5f9;
+  --color-sidebar: #0f172a;
+  --color-sidebar-foreground: #e2e8f0;
+  --color-sidebar-hover: #1e293b;
+}

@@ -1,6 +1,6 @@
 # StudentContext AI -- Architecture Documentation
 
-**Version:** 0.5.0
+**Version:** 0.12.0
 **Company:** EcoWorks Web Architecture Inc.
 **Target Customer:** Ontario school boards (starting with Thames Valley DSB)
 **Repository:** AI-Student-Context-Service
@@ -23,7 +23,8 @@
 12. [Port Assignments](#port-assignments)
 13. [Running Locally](#running-locally)
 14. [Test Users](#test-users)
-15. [Sprint Progression](#sprint-progression)
+15. [MCP Server](#mcp-server)
+16. [Sprint Progression](#sprint-progression)
 
 ---
 
@@ -48,6 +49,7 @@ LLM. Every context retrieval is logged for FIPPA compliance auditing.
 +============================================================================+
 |                            CLIENT LAYER (React/Vite)                       |
 |                         https://dev.ecoworks.ca:3009                       |
+|                         shadcn/ui + Tailwind CSS                           |
 |                                                                            |
 |   +----------------+   +----------------+   +---------------------------+  |
 |   |  Login Page    |   |  Student Chat  |   |      Staff Portal         |  |
@@ -55,33 +57,50 @@ LLM. Every context retrieval is logged for FIPPA compliance auditing.
 |   |                |   |   parent)      |   |  |Chat |Reports |Insight| |  |
 |   +-------+--------+   +-------+--------+   |  |Tab  |Tab     |Tab   | |  |
 |           |                     |            |  +-----+--------+------+ |  |
-|           |   AuthProvider (JWT token, localStorage)                    |  |
-|           +---------------------|---+----+------------------------------+  |
-|                                 |   |    |                                 |
+|   +-------+---------------------+------+------+-----+                    |
+|   | Parent Consent |  | Admin Dashboard |  | Changelog Modal |           |
+|   | Portal         |  | (audit, users)  |  | (docs, roadmap) |           |
+|   +----------------+  +-----------------+  +-----------------+           |
+|           |                                                               |
+|           |   Auth Provider (dev JWT | future: Clerk, Entra, Google)     |
+|           +-------------------------------+------------------------------+  |
+|                                           |                                |
 |   Vite Dev Server proxies /api/* and /health to backend                    |
-+============================|===|====|======================================+
-                              |   |    |
-                              v   v    v
-+============================================================================+
-|                        API GATEWAY (Express/HTTPS)                         |
-|                      https://dev.ecoworks.ca:3094                          |
-|                                                                            |
-|   Middleware: helmet, CORS, express.json(1mb), JWT auth                    |
-|                                                                            |
-|   +------------+  +------------+  +-------------+  +-------------------+   |
-|   | /health    |  | /api/auth  |  | /api/chat   |  | /api/staff        |   |
-|   |            |  | dev-login  |  | message     |  | students, courses |   |
-|   |            |  | me         |  | sessions    |  | report-comments   |   |
-|   |            |  |            |  | sessions/:id|  | class insights    |   |
-|   +------------+  +------------+  +-------------+  +-------------------+   |
-|   +-------------------+  +-------------------+                             |
-|   | /api/admin        |  | /api/webhooks     |                             |
-|   | ingest, sync,     |  | google (stub)     |                             |
-|   | sync status       |  |                   |                             |
-|   +-------------------+  +-------------------+                             |
-+============================|===============================================+
++============================|==============================================+
                               |
-                              v
+              +---------------+---------------+
+              v                               v
++=============================+  +=============================+
+|    API GATEWAY              |  |      MCP SERVER             |
+|    (Express/HTTPS)          |  |      (stdio transport)      |
+|  dev.ecoworks.ca:3094       |  |                             |
+|                             |  |  Tools:                     |
+|  Middleware: helmet, CORS,  |  |   search_student_context    |
+|  express.json, Auth Provider|  |   get_permission_scope      |
+|                             |  |   check_consent             |
+|  +----------+ +----------+ |  |   ingest_document           |
+|  | /health  | | /api/auth| |  |                             |
+|  |          | | dev-login| |  |  Resources:                  |
+|  |          | | me       | |  |   student context            |
+|  |          | | provider | |  |   audit logs                 |
+|  +----------+ +----------+ |  |   session history            |
+|  +----------+ +----------+ |  +=============================+
+|  | /api/chat| | /api/    | |
+|  | message  | | staff    | |
+|  | stream   | | students | |
+|  | sessions | | reports  | |
+|  +----------+ +----------+ |
+|  +----------+ +----------+ |
+|  | /api/    | | /api/    | |
+|  | admin    | | webhooks | |
+|  | ingest   | | google   | |
+|  | sync     | | sis      | |
+|  | sis/sync | |          | |
+|  | usage    | |          | |
+|  +----------+ +----------+ |
++=============================+
+              |
+              v
 +============================================================================+
 |                          SERVICE LAYER                                     |
 |                                                                            |
@@ -92,14 +111,21 @@ LLM. Every context retrieval is logged for FIPPA compliance auditing.
 |   +--------+----------+    +--------------------+    +------------------+  |
 |            |                                                               |
 |   +--------v----------+    +--------------------+    +------------------+  |
-|   | LLM Adapter       |    | Embedder Service   |    | Audit Service    |  |
-|   | (Claude/Anthropic) |    | (OpenAI embeddings)|    | (FIPPA logging) |  |
-|   +-------------------+    +--------------------+    +------------------+  |
+|   | LLM Gateway       |    | Embedder Service   |    | Audit Service    |  |
+|   | (token tracking)  |    | (OpenAI embeddings)|    | (FIPPA logging) |  |
+|   | +---------------+ |    +--------------------+    +------------------+  |
+|   | | Claude        | |                                                    |
+|   | | OpenAI GPT-4o | |    +--------------------+    +------------------+  |
+|   | | Gemini        | |    | Auth Provider      |    | SIS Provider     |  |
+|   | | Groq (Llama)  | |    | (dev | clerk |     |    | (Mock | Aspen)  |  |
+|   | | Mistral       | |    |  entra | google)   |    | OAuth 2.0,      |  |
+|   | +---------------+ |    +--------------------+    | auto-refresh     |  |
+|   +-------------------+                              +------------------+  |
 |                                                                            |
 |   +--------------------------------------------------------------------+  |
 |   | Ingestion Pipeline                                                  |  |
 |   | hash-dedup --> chunk (500tok/50 overlap) --> embed --> store         |  |
-|   | Google Classroom Sync (OAuth, courses, submissions, grades)         |  |
+|   | Google Classroom Sync | Aspen SIS Sync (full + incremental)        |  |
 |   +--------------------------------------------------------------------+  |
 +============================|===============================================+
                               |
@@ -111,7 +137,8 @@ LLM. Every context retrieval is logged for FIPPA compliance auditing.
 |                                                                            |
 |   +----------+  +----------+  +----------+  +------------------+          |
 |   | boards   |  | schools  |  | users    |  | student_         |          |
-|   |          |  |          |  |          |  | enrollments      |          |
+|   | (sis_    |  |          |  |          |  | enrollments      |          |
+|   | provider)|  |          |  |          |  |                  |          |
 |   +----------+  +----------+  +----------+  +------------------+          |
 |   +----------+  +----------+  +---------------------+                     |
 |   | courses  |  | course_  |  | staff_assignments   |                     |
@@ -121,10 +148,10 @@ LLM. Every context retrieval is logged for FIPPA compliance auditing.
 |   | documents|->| chunks   |->| embed-   |  HNSW index                    |
 |   | (SHA-256)|  | (500tok) |  | dings    |  (vector_cosine_ops)           |
 |   +----------+  +----------+  +----------+                                |
-|   +---------------+  +----------+  +-----------------+                    |
-|   | consent_      |  | audit_   |  | chat_sessions + |                    |
-|   | records       |  | log      |  | chat_messages   |                    |
-|   +---------------+  +----------+  +-----------------+                    |
+|   +---------------+  +----------+  +-----------------+  +-------------+   |
+|   | consent_      |  | audit_   |  | chat_sessions + |  | token_usage |   |
+|   | records       |  | log      |  | chat_messages   |  | (billing)   |   |
+|   +---------------+  +----------+  +-----------------+  +-------------+   |
 +============================================================================+
 ```
 
@@ -612,7 +639,9 @@ consent_status:    pending | granted | denied | revoked
 | GET | `/health` | No | None | Database connectivity check |
 | POST | `/api/auth/dev-login` | No | None | Email + password login, returns JWT |
 | GET | `/api/auth/me` | Yes | None | Current user profile from token |
+| GET | `/api/auth/provider` | No | None | Returns the active auth provider name |
 | POST | `/api/chat/message` | Yes | None | Send message, receive RAG-augmented response |
+| POST | `/api/chat/message/stream` | Yes | None | Send message, receive streaming SSE response |
 | GET | `/api/chat/sessions` | Yes | None | List user's chat sessions |
 | GET | `/api/chat/sessions/:id` | Yes | Owner only | Get session with full message history |
 | GET | `/api/staff/students` | Yes | Staff roles | List students in scope with course info |
@@ -623,7 +652,11 @@ consent_status:    pending | granted | denied | revoked
 | POST | `/api/admin/sync/trigger` | Yes | Admin roles | Trigger Google Classroom sync |
 | GET | `/api/admin/sync/google-auth-url` | Yes | Admin roles | Get Google OAuth consent URL |
 | GET | `/api/admin/sync/status` | Yes | Admin roles | Document/chunk/embedding counts |
+| POST | `/api/admin/sis/sync` | Yes | Admin roles | Trigger Aspen SIS data sync for a student |
+| GET | `/api/admin/sis/status` | Yes | Admin roles | SIS sync status and last sync timestamps |
+| GET | `/api/admin/usage` | Yes | Admin roles | LLM token usage and cost stats by provider/model |
 | POST | `/api/webhooks/google` | No | None | Google Classroom push notifications (stub) |
+| POST | `/api/webhooks/sis` | No | None | SIS data change notifications for incremental sync |
 
 Staff roles: teacher, educational_assistant, guidance_counsellor, vice_principal, principal, supply_teacher
 
@@ -913,6 +946,23 @@ All development users share the password: `devpassword123`
 
 ---
 
+## MCP Server
+
+StudentContext AI exposes its Context Engine via the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/), enabling integration with Claude Desktop and other MCP-compatible clients.
+
+For full setup instructions, tool/resource definitions, and configuration examples, see [docs/MCP.md](./MCP.md).
+
+### Quick Overview
+
+| Component | Details |
+|-----------|---------|
+| Transport | stdio |
+| Tools | `search_student_context`, `get_permission_scope`, `check_consent`, `ingest_document` |
+| Resources | Student context data, audit logs, session history |
+| Integration | Claude Desktop via `claude_desktop_config.json` |
+
+---
+
 ## Sprint Progression
 
 ### Sprint 1: Foundation (v0.1.0) -- COMPLETE
@@ -968,16 +1018,51 @@ All development users share the password: `devpassword123`
 - Staff-scoped chat: messages automatically target the selected student via target_student_id
 - Text-to-speech: Web Speech API integration for reading AI responses aloud with play/pause/stop controls and intelligent voice selection
 
-### Sprint 6: Consent and Admin -- PLANNED
-- Parent consent portal for granting/revoking AI context access
-- Admin dashboard with audit log viewer
-- Consent management UI with granular source selection
+### Sprint 6 & 7: Consent, Admin & Infrastructure (v0.6.0) -- COMPLETE
+- Parent Consent Portal: view children, grant/revoke AI context consent with granular data source selection
+- Admin Dashboard: board-wide statistics, audit log viewer with filters, user management
+- Consent API routes and admin API expansion
+- Row-Level Security (RLS) migration: PostgreSQL policies for multi-tenant board_id isolation on all 12 tenant-scoped tables
+- Production Dockerfile (multi-stage build) and production Docker Compose with pgvector health checks
+- .dockerignore for clean build contexts
 
-### Sprint 7: Pilot Prep -- PLANNED
-- SIS (Aspen/Follett) integration for report cards, transcripts, attendance, IEPs
-- SAML/OIDC SSO integration with school board identity providers
-- Security audit and penetration testing
-- FIPPA compliance review
-- Canadian hosting (data sovereignty)
-- Row-level security as defense-in-depth
-- Production deployment configuration
+### Sprint 8: Auth Abstraction + Aspen Rename (v0.8.0) -- COMPLETE
+- AuthProvider interface with factory pattern (backend + client)
+- DevAuthProvider wrapping existing JWT/bcrypt auth, ClientAuthProvider for frontend
+- GET /api/auth/provider endpoint, AUTH_PROVIDER env var (dev | clerk | entra | google)
+- Renamed all Trillium SIS references to Aspen (Follett) throughout codebase
+- Multi-LLM provider support enhancement
+
+### Sprint 9: MCP Server + Chat Streaming (v0.9.0) -- COMPLETE
+- MCP server exposing Context Engine via Model Context Protocol (stdio transport)
+- Tools: search_student_context, get_permission_scope, check_consent, ingest_document
+- Resources: student context, audit logs, session history
+- Chat streaming with Server-Sent Events: AsyncGenerator chatStream() on Claude, OpenAI, Groq providers
+- POST /api/chat/message/stream SSE endpoint with progressive client rendering
+- Streaming state management in useChat hook
+
+### Sprint 10: LLM Gateway with Token Tracking (v0.10.0) -- COMPLETE
+- LLMGateway class wrapping all 5 providers with automatic token tracking
+- Token usage table (migration 008) with provider, model, input/output tokens, cost estimate
+- Pricing tables for Claude, OpenAI, Gemini, Groq, and Mistral models
+- GET /api/admin/usage endpoint for board-level billing stats
+- Per-provider and per-model aggregation queries
+- Context engine and staff routes migrated to LLMGateway
+
+### Sprint 11: Aspen SIS Real Integration (v0.11.0) -- COMPLETE
+- SISProvider interface with 8 methods (student, report cards, transcript, attendance, IEP, EQAO, roster, school students)
+- MockSISProvider wrapping existing mock-data.ts, AspenSISProvider with OAuth 2.0 client credentials
+- Provider factory reads SIS_PROVIDER env var (mock/aspen) with auto-refresh and retry logic
+- syncStudent() service for full data sync into embedding pipeline
+- Admin endpoints: POST /api/admin/sis/sync, GET /api/admin/sis/status
+- SIS webhook handler for incremental sync
+- Migration 009: sis_provider and sis_config on boards table
+
+### Sprint 12: Chat UI Polish + Documentation (v0.12.0) -- COMPLETE
+- shadcn/ui design system with Tailwind CSS integration
+- UI primitive components: Button, Card, Dialog, Tabs, Avatar, Tooltip, Badge
+- In-app Changelog modal with tabs: Changelog, How It Works, Roadmap
+- Dark/light theme support via ThemeProvider
+- Lucide React icons replacing inline SVGs
+- Updated all page components with shadcn/ui styling
+- Comprehensive MCP server documentation (docs/MCP.md)
