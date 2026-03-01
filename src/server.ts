@@ -6,9 +6,14 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from './config/index.js';
+import { validateRequiredEnv } from './config/validate.js';
 import { healthRouter, authRouter, adminRouter, webhooksRouter, chatRouter, staffRouter, consentRouter, openaiCompatRouter } from './routes/index.js';
+import { chatRateLimit, adminRateLimit, openaiCompatRateLimit } from './middleware/rate-limit.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Fail-fast: validate required env vars
+validateRequiredEnv();
 
 const app = express();
 
@@ -16,13 +21,17 @@ app.use(helmet());
 app.use(cors({ origin: config.corsOrigin, credentials: true }));
 app.use(express.json({ limit: '1mb' }));
 
+// Routes with rate limiting
 app.use(healthRouter);
 app.use(authRouter);
+app.use('/api/admin', adminRateLimit);
 app.use(adminRouter);
 app.use(webhooksRouter);
+app.use('/api/chat', chatRateLimit);
 app.use(chatRouter);
 app.use(staffRouter);
 app.use(consentRouter);
+app.use('/v1', openaiCompatRateLimit);
 app.use(openaiCompatRouter);
 
 const certsDir = path.resolve(__dirname, '..', '..', '.shared-certs');

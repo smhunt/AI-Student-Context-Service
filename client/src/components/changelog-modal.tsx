@@ -3,11 +3,28 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from './ui/badge.js';
 import { Info } from 'lucide-react';
 
-export const APP_VERSION = '0.12.0';
+export const APP_VERSION = '1.0.0';
 
 type ChangelogTab = 'changelog' | 'how-it-works' | 'roadmap';
 
 export const CHANGELOG = [
+  {
+    version: '1.0.0',
+    date: '2026-03-01',
+    changes: [
+      'Entra ID and Google Identity auth stubs with swap documentation',
+      'API Key Broker: EcoWorks manages all LLM keys with markup billing',
+      'Board billing limits enforcement (90% warning, 100% reject)',
+      'MCP HTTP/SSE transport for deployable context engine',
+      'context_augmented_chat and bulk_search MCP tools',
+      'OneRoster 1.1 SIS provider (works with any compliant SIS)',
+      'Batch sync: school-level and board-level with concurrency control',
+      'OpenAI-compatible API for OpenWebUI integration',
+      'Rate limiting on all API endpoints',
+      'Detailed health checks with component status',
+      'E2E test suite and production Docker Compose',
+    ],
+  },
   {
     version: '0.12.0',
     date: '2026-02-28',

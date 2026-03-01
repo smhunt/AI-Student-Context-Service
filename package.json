@@ -1,6 +1,6 @@
 {
   "name": "studentcontext-ai",
-  "version": "0.12.0",
+  "version": "1.0.0",
   "type": "module",
   "private": true,
   "scripts": {
@@ -14,10 +14,13 @@
     "mcp": "tsx src/mcp/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "TEST_E2E=true vitest run tests/e2e/",
+    "mcp:http": "tsx src/mcp/http-server.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
+    "@clerk/express": "^1.7.76",
     "@google/generative-ai": "^0.24.1",
     "@mistralai/mistralai": "^1.14.1",
     "@modelcontextprotocol/sdk": "^1.27.1",

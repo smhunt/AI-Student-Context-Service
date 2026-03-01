@@ -10,6 +10,43 @@ For API endpoint reference, see [docs/API.md](docs/API.md).
 
 ---
 
+## [1.0.0] - 2026-03-01
+
+**v1.0.0 — Platform Commercialization Release** (Sprints 13-18)
+
+### Added
+- **Entra ID auth provider** (stub) — Azure AD JWT verification via JWKS, MSAL client
+- **Google Identity auth provider** (stub) — Google ID token verification, GIS client
+- **Clerk webhook handler** — Auto-provisions users on `user.created/updated/deleted` events
+- **Auth swap documentation** (`docs/Auth-Providers.md`) — Interface contract, env vars, step-by-step swap guide
+- **API Key Broker** — EcoWorks holds master keys, proxies requests with markup, enforces board limits
+- **Board LLM config** (migration 010) — Allowed providers, monthly limits, billing plans, markup multiplier
+- **Billing API** — `GET /api/admin/billing`, `GET /api/admin/billing/history`, `PUT /api/admin/billing/config`
+- **MCP HTTP/SSE transport** — Standalone deployable context engine on configurable port
+- **`context_augmented_chat` MCP tool** — Full RAG pipeline as single tool call
+- **`bulk_search` MCP tool** — Search across all students in permission scope
+- **MCP Docker deployment** (`Dockerfile.mcp`, `docker-compose.mcp.yml`)
+- **OneRoster 1.1 SIS provider** — IMS Global standard, works with Aspen, PowerSchool, Veracross
+- **Batch sync** — `syncSchool()` and `syncBoard()` with concurrency limiting
+- **Aspen SIS architecture docs** (`docs/Aspen-SIS.md`) — Technical stack, data mapping, Ontario specifics
+- **Google Classroom docs** (`docs/Google-Classroom.md`) — OAuth flow, document types, webhook setup
+- **OpenAI-compatible API** — `POST /v1/chat/completions`, `GET /v1/models` for OpenWebUI integration
+- **OpenWebUI integration docs** (`docs/OpenWebUI-Integration.md`)
+- **Rate limiting** — chat 30/min, admin 60/min, OpenAI-compat 100/min, MCP HTTP 120/min
+- **Detailed health check** — `GET /health/detailed` with component status, provider listing
+- **Env var validation** — Fail-fast startup checks for required vars per configured mode
+- **E2E test suite** (`tests/e2e/`) — Auth, chat, billing, health check flows
+- **Production Docker Compose** — Main app + MCP HTTP + PostgreSQL + optional OpenWebUI
+
+### Changed
+- Context engine routes through API key broker instead of direct gateway calls
+- MCP server version bumped to 1.0.0 with 6 tools (was 4)
+- SIS factory supports `SIS_PROTOCOL=oneroster` for vendor-agnostic integration
+- SIS webhook auto-resolves student by OEN when board_id/student_id not provided
+- Production Docker Compose expanded with all service env vars and health checks
+
+---
+
 ## [0.12.0] - 2026-02-28
 
 Sprint 12: Chat UI polish + Documentation -- shadcn/ui design system, theme support, and in-app documentation.

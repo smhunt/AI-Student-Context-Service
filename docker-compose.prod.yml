@@ -10,10 +10,8 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sc_prod"]
+      test: ["CMD-SHELL", "pg_isready -U sc_prod -d studentcontext"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -29,14 +27,82 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://sc_prod:${DB_PASSWORD}@db:5432/studentcontext
-      PORT: 3094
+      PORT: "3094"
       NODE_ENV: production
+      AUTH_PROVIDER: ${AUTH_PROVIDER:-clerk}
       JWT_SECRET: ${JWT_SECRET}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
+      CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY}
+      CLERK_WEBHOOK_SECRET: ${CLERK_WEBHOOK_SECRET}
+      LLM_PROVIDER: ${LLM_PROVIDER:-claude}
       CLAUDE_API_KEY: ${CLAUDE_API_KEY}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
-      CORS_ORIGIN: ${CORS_ORIGIN}
+      OPENAI_CHAT_API_KEY: ${OPENAI_CHAT_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY}
+      SIS_PROVIDER: ${SIS_PROVIDER:-mock}
+      SIS_PROTOCOL: ${SIS_PROTOCOL:-rest}
+      ASPEN_BASE_URL: ${ASPEN_BASE_URL}
+      ASPEN_CLIENT_ID: ${ASPEN_CLIENT_ID}
+      ASPEN_CLIENT_SECRET: ${ASPEN_CLIENT_SECRET}
+      ONEROSTER_BASE_URL: ${ONEROSTER_BASE_URL}
+      ONEROSTER_CLIENT_ID: ${ONEROSTER_CLIENT_ID}
+      ONEROSTER_CLIENT_SECRET: ${ONEROSTER_CLIENT_SECRET}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://dev.ecoworks.ca:3009}
+      MCP_HTTP_ENABLED: ${MCP_HTTP_ENABLED:-false}
+      MCP_HTTP_PORT: "3095"
     ports:
       - "3094:3094"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('https://localhost:3094/health',{rejectUnauthorized:false}).then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      com.ecoworks.project: "studentcontext-ai"
+      com.ecoworks.environment: "production"
+
+  mcp-http:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://sc_prod:${DB_PASSWORD}@db:5432/studentcontext
+      NODE_ENV: production
+      MCP_HTTP_ENABLED: "true"
+      MCP_HTTP_PORT: "3095"
+      AUTH_PROVIDER: ${AUTH_PROVIDER:-clerk}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      LLM_PROVIDER: ${LLM_PROVIDER:-claude}
+      CLAUDE_API_KEY: ${CLAUDE_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    ports:
+      - "3095:3095"
+    profiles:
+      - mcp
+    labels:
+      com.ecoworks.project: "studentcontext-ai"
+      com.ecoworks.environment: "production"
+
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:main
+    restart: always
+    depends_on:
+      - app
+    environment:
+      OPENAI_API_BASE_URL: https://app:3094/v1
+      OPENAI_API_KEY: ${OPENWEBUI_API_KEY}
+    ports:
+      - "3010:8080"
+    profiles:
+      - openwebui
     labels:
       com.ecoworks.project: "studentcontext-ai"
       com.ecoworks.environment: "production"
