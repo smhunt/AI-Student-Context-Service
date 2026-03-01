@@ -1,11 +1,11 @@
 /**
  * Large-scale seed data generator for StudentContext AI.
  * Creates a realistic 25,000-student school board (TVDSB) with:
- * - 10 real TVDSB secondary schools
- * - ~1,385 staff across all roles
- * - ~8,000 parents (with sibling grouping)
- * - Ontario curriculum courses (grades 9-12)
- * - ~100,000 course memberships
+ * - 10 secondary schools (grades 9-12, ~1,000-1,500 students each)
+ * - 26 elementary schools (JK-8, ~350-650 students each)
+ * - Type-appropriate staffing (1 VP elementary, 2 VP secondary, etc.)
+ * - Ontario curriculum courses (elementary subjects + secondary coded courses)
+ * - ~140,000 course memberships
  * - 25,000 consent records
  * - ~200 sample documents (no embeddings)
  *
@@ -109,18 +109,55 @@ const LAST_NAMES = [
   'Mwangi', 'Kimani',
 ] as const;
 
-const SCHOOLS = [
-  { code: 'MHS', name: 'Medway High School' },
-  { code: 'CECI', name: 'Central Elgin Collegiate Institute' },
-  { code: 'SSS', name: 'Saunders Secondary School' },
-  { code: 'SFBS', name: 'Sir Frederick Banting Secondary School' },
-  { code: 'CRSS', name: 'Clarke Road Secondary School' },
-  { code: 'MSS', name: 'Montcalm Secondary School' },
-  { code: 'ABLS', name: 'A.B. Lucas Secondary School' },
-  { code: 'WSS', name: 'Westminster Secondary School' },
-  { code: 'OAK', name: 'Oakridge Secondary School' },
-  { code: 'PCI', name: 'Parkside Collegiate Institute' },
-] as const;
+// Grade encoding: -1 = JK, 0 = SK, 1-8 = elementary, 9-12 = secondary
+interface SchoolDef {
+  code: string;
+  name: string;
+  type: 'elementary' | 'secondary';
+  grades: number[];
+  targetStudents: number;
+}
+
+const SCHOOLS: SchoolDef[] = [
+  // ── Secondary schools (10) — grades 9-12 ──
+  { code: 'MHS',  name: 'Medway High School',                       type: 'secondary', grades: [9, 10, 11, 12], targetStudents: 1400 },
+  { code: 'CECI', name: 'Central Elgin Collegiate Institute',       type: 'secondary', grades: [9, 10, 11, 12], targetStudents: 1200 },
+  { code: 'SSS',  name: 'Saunders Secondary School',                type: 'secondary', grades: [9, 10, 11, 12], targetStudents: 1500 },
+  { code: 'SFBS', name: 'Sir Frederick Banting Secondary School',   type: 'secondary', grades: [9, 10, 11, 12], targetStudents: 1300 },
+  { code: 'CRSS', name: 'Clarke Road Secondary School',             type: 'secondary', grades: [9, 10, 11, 12], targetStudents: 1100 },
+  { code: 'MSS',  name: 'Montcalm Secondary School',                type: 'secondary', grades: [9, 10, 11, 12], targetStudents: 1000 },
+  { code: 'ABLS', name: 'A.B. Lucas Secondary School',              type: 'secondary', grades: [9, 10, 11, 12], targetStudents: 1400 },
+  { code: 'WSS',  name: 'Westminster Secondary School',             type: 'secondary', grades: [9, 10, 11, 12], targetStudents: 1100 },
+  { code: 'OAK',  name: 'Oakridge Secondary School',                type: 'secondary', grades: [9, 10, 11, 12], targetStudents: 1000 },
+  { code: 'PCI',  name: 'Parkside Collegiate Institute',            type: 'secondary', grades: [9, 10, 11, 12], targetStudents: 1000 },
+  // ── Elementary schools (26) — JK through grade 8 ──
+  { code: 'SCPS', name: 'Stoney Creek Public School',               type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 550 },
+  { code: 'BNPS', name: 'Byron Northview Public School',            type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 500 },
+  { code: 'EHPS', name: 'Eagle Heights Public School',              type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 480 },
+  { code: 'OPPS', name: 'Orchard Park Public School',               type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 520 },
+  { code: 'JCPS', name: 'Jack Chambers Public School',              type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 600 },
+  { code: 'TWPS', name: 'Tweedsmuir Public School',                 type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 450 },
+  { code: 'SACS', name: 'Sir Arthur Currie Public School',          type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 530 },
+  { code: 'CDPS', name: 'Cleardale Public School',                  type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 400 },
+  { code: 'LBPS', name: 'Lambeth Public School',                    type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 480 },
+  { code: 'NRPS', name: 'Northridge Public School',                 type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 500 },
+  { code: 'ECPS', name: 'Emily Carr Public School',                 type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 520 },
+  { code: 'WJPS', name: 'Wilfrid Jury Public School',               type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 460 },
+  { code: 'KPPS', name: 'Kensal Park Public School',                type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 500 },
+  { code: 'RYPS', name: 'Ryerson Public School',                    type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 380 },
+  { code: 'LRPS', name: 'Lord Roberts Public School',               type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 420 },
+  { code: 'LAPS', name: 'Lorne Avenue Public School',               type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 350 },
+  { code: 'ROPS', name: 'River Oaks Public School',                 type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 550 },
+  { code: 'SHPS', name: 'Sherwood Fox Public School',               type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 470 },
+  { code: 'WOPS', name: 'Woodland Heights Public School',           type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 510 },
+  { code: 'SVPS', name: 'Springbank Public School',                 type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 530 },
+  { code: 'MEPS', name: 'Masonville Public School',                 type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 490 },
+  { code: 'HTPS', name: 'Hillcrest Public School',                  type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 440 },
+  { code: 'WCPS', name: 'White Oaks Public School',                 type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 560 },
+  { code: 'FDPS', name: 'Fairmont Public School',                   type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 500 },
+  { code: 'GSPS', name: 'Glastonbury Public School',                type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 510 },
+  { code: 'CLPS', name: 'Clara Brenton Public School',              type: 'elementary', grades: [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8], targetStudents: 500 },
+];
 
 interface CourseTemplate {
   code: string;
@@ -191,9 +228,16 @@ const COURSE_TEMPLATES: CourseTemplate[] = [
   { code: 'PPL4O', name: 'Healthy Active Living Education', grade: 12, subject: 'Physical Education', compulsory: false, stream: 'O' },
 ];
 
-const DEPARTMENTS = [
+// Secondary teacher departments (for assignment matching with course subjects)
+const SECONDARY_DEPARTMENTS = [
   'Mathematics', 'Science', 'English', 'French', 'Social Sciences',
   'Physical Education', 'Arts', 'Technology', 'Business', 'Computer Science',
+] as const;
+
+// Elementary curriculum subjects (Ontario grades JK-8)
+const ELEM_SUBJECTS = [
+  'Language Arts', 'Mathematics', 'Science & Technology',
+  'Social Studies', 'French', 'Health & Physical Education', 'The Arts',
 ] as const;
 
 const CONSENT_SOURCES = [
@@ -201,8 +245,12 @@ const CONSENT_SOURCES = [
   'google_classroom_grade', 'sis_report_card',
 ];
 
-const STUDENTS_PER_SCHOOL = 2500;
-const STUDENTS_PER_GRADE = Math.floor(STUDENTS_PER_SCHOOL / 4); // 625
+// Human-readable grade labels for JK/SK
+function gradeLabel(g: number): string {
+  if (g === -1) return 'JK';
+  if (g === 0) return 'SK';
+  return String(g);
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -261,12 +309,21 @@ function generateStudents(): { students: UserRow[]; enrollments: EnrollmentRow[]
   let counter = 1;
 
   for (let schoolIdx = 0; schoolIdx < SCHOOLS.length; schoolIdx++) {
-    for (let grade = 9; grade <= 12; grade++) {
-      for (let i = 0; i < STUDENTS_PER_GRADE; i++) {
+    const school = SCHOOLS[schoolIdx];
+    const gradesCount = school.grades.length;
+    const basePerGrade = Math.floor(school.targetStudents / gradesCount);
+
+    for (const grade of school.grades) {
+      // Add ±5% jitter per grade for realism
+      const jitter = randomInt(-Math.floor(basePerGrade * 0.05), Math.floor(basePerGrade * 0.05));
+      const count = basePerGrade + jitter;
+
+      for (let i = 0; i < count; i++) {
         const firstName = pick(FIRST_NAMES);
         const lastName = pick(LAST_NAMES);
         const extId = `STU-2026-${String(counter).padStart(5, '0')}`;
         const oen = String(300000000 + counter);
+        const gl = gradeLabel(grade);
 
         students.push({
           email: `${cleanName(firstName)}.${cleanName(lastName)}${counter}@student.tvdsb.on.ca`,
@@ -274,7 +331,7 @@ function generateStudents(): { students: UserRow[]; enrollments: EnrollmentRow[]
           name_last: lastName,
           role: 'student',
           external_id: extId,
-          metadata: { generated: true, grade, oen, homeroom: `${grade}${String.fromCharCode(65 + (i % 8))}` },
+          metadata: { generated: true, grade, oen, homeroom: `${gl}${String.fromCharCode(65 + (i % 8))}` },
         });
 
         enrollments.push({ studentIdx: students.length - 1, schoolIdx, grade });
@@ -291,102 +348,58 @@ function generateStaff(): { staff: UserRow[]; assignments: StaffAssignmentRow[] 
   const assignments: StaffAssignmentRow[] = [];
   let counter = 100;
 
+  function addStaff(schoolIdx: number, role: string, dept: string | null, roleScope: string, extPrefix = 'STAFF') {
+    const firstName = pick(FIRST_NAMES);
+    const lastName = pick(LAST_NAMES);
+    staff.push({
+      email: `${cleanName(firstName)}.${cleanName(lastName)}${counter}@tvdsb.on.ca`,
+      name_first: firstName,
+      name_last: lastName,
+      role,
+      external_id: `${extPrefix}-${String(counter).padStart(5, '0')}`,
+      metadata: { generated: true, ...(dept ? { department: dept } : {}) },
+    });
+    assignments.push({ staffIdx: staff.length - 1, schoolIdx, department: dept, role_scope: roleScope });
+    counter++;
+  }
+
   for (let schoolIdx = 0; schoolIdx < SCHOOLS.length; schoolIdx++) {
-    // Teachers (~113 per school)
-    for (let i = 0; i < 113; i++) {
-      const dept = DEPARTMENTS[i % DEPARTMENTS.length];
-      const firstName = pick(FIRST_NAMES);
-      const lastName = pick(LAST_NAMES);
-      staff.push({
-        email: `${cleanName(firstName)}.${cleanName(lastName)}${counter}@tvdsb.on.ca`,
-        name_first: firstName,
-        name_last: lastName,
-        role: 'teacher',
-        external_id: `STAFF-${String(counter).padStart(5, '0')}`,
-        metadata: { generated: true, department: dept },
-      });
-      assignments.push({ staffIdx: staff.length - 1, schoolIdx, department: dept, role_scope: 'teacher' });
-      counter++;
+    const school = SCHOOLS[schoolIdx];
+    const isElem = school.type === 'elementary';
+
+    // Teachers — elementary ~25, secondary ~65
+    const teacherCount = isElem ? 25 : 65;
+    const depts = isElem ? ELEM_SUBJECTS : SECONDARY_DEPARTMENTS;
+    for (let i = 0; i < teacherCount; i++) {
+      addStaff(schoolIdx, 'teacher', depts[i % depts.length], 'teacher');
     }
 
-    // Guidance (6 per school)
-    for (let i = 0; i < 6; i++) {
-      const firstName = pick(FIRST_NAMES);
-      const lastName = pick(LAST_NAMES);
-      staff.push({
-        email: `${cleanName(firstName)}.${cleanName(lastName)}${counter}@tvdsb.on.ca`,
-        name_first: firstName,
-        name_last: lastName,
-        role: 'guidance_counsellor',
-        external_id: `STAFF-${String(counter).padStart(5, '0')}`,
-        metadata: { generated: true, department: 'Guidance' },
-      });
-      assignments.push({ staffIdx: staff.length - 1, schoolIdx, department: 'Guidance', role_scope: 'guidance' });
-      counter++;
+    // Guidance — secondary only (3 per school)
+    if (!isElem) {
+      for (let i = 0; i < 3; i++) {
+        addStaff(schoolIdx, 'guidance_counsellor', 'Guidance', 'guidance');
+      }
     }
 
-    // EAs (10 per school)
-    for (let i = 0; i < 10; i++) {
-      const firstName = pick(FIRST_NAMES);
-      const lastName = pick(LAST_NAMES);
-      staff.push({
-        email: `${cleanName(firstName)}.${cleanName(lastName)}${counter}@tvdsb.on.ca`,
-        name_first: firstName,
-        name_last: lastName,
-        role: 'educational_assistant',
-        external_id: `STAFF-${String(counter).padStart(5, '0')}`,
-        metadata: { generated: true, department: 'Special Education' },
-      });
-      assignments.push({ staffIdx: staff.length - 1, schoolIdx, department: 'Special Education', role_scope: 'support' });
-      counter++;
+    // EAs — elementary 4, secondary 7
+    const eaCount = isElem ? 4 : 7;
+    for (let i = 0; i < eaCount; i++) {
+      addStaff(schoolIdx, 'educational_assistant', 'Special Education', 'support');
     }
 
-    // VPs (5 per school)
-    for (let i = 0; i < 5; i++) {
-      const firstName = pick(FIRST_NAMES);
-      const lastName = pick(LAST_NAMES);
-      staff.push({
-        email: `${cleanName(firstName)}.${cleanName(lastName)}${counter}@tvdsb.on.ca`,
-        name_first: firstName,
-        name_last: lastName,
-        role: 'vice_principal',
-        external_id: `STAFF-${String(counter).padStart(5, '0')}`,
-        metadata: { generated: true },
-      });
-      assignments.push({ staffIdx: staff.length - 1, schoolIdx, department: null, role_scope: 'admin' });
-      counter++;
+    // VPs — elementary 1, secondary 2
+    const vpCount = isElem ? 1 : 2;
+    for (let i = 0; i < vpCount; i++) {
+      addStaff(schoolIdx, 'vice_principal', null, 'admin');
     }
 
-    // Principal (1 per school)
-    {
-      const firstName = pick(FIRST_NAMES);
-      const lastName = pick(LAST_NAMES);
-      staff.push({
-        email: `${cleanName(firstName)}.${cleanName(lastName)}${counter}@tvdsb.on.ca`,
-        name_first: firstName,
-        name_last: lastName,
-        role: 'principal',
-        external_id: `STAFF-${String(counter).padStart(5, '0')}`,
-        metadata: { generated: true },
-      });
-      assignments.push({ staffIdx: staff.length - 1, schoolIdx, department: null, role_scope: 'admin' });
-      counter++;
-    }
+    // Principal — 1 per school
+    addStaff(schoolIdx, 'principal', null, 'admin');
 
-    // Supply teachers (3 per school)
-    for (let i = 0; i < 3; i++) {
-      const firstName = pick(FIRST_NAMES);
-      const lastName = pick(LAST_NAMES);
-      staff.push({
-        email: `${cleanName(firstName)}.${cleanName(lastName)}${counter}@tvdsb.on.ca`,
-        name_first: firstName,
-        name_last: lastName,
-        role: 'supply_teacher',
-        external_id: `STAFF-${String(counter).padStart(5, '0')}`,
-        metadata: { generated: true },
-      });
-      assignments.push({ staffIdx: staff.length - 1, schoolIdx, department: null, role_scope: 'supply' });
-      counter++;
+    // Supply teachers — elementary 2, secondary 3
+    const supplyCount = isElem ? 2 : 3;
+    for (let i = 0; i < supplyCount; i++) {
+      addStaff(schoolIdx, 'supply_teacher', null, 'supply');
     }
   }
 
@@ -448,21 +461,46 @@ function generateParents(
   return { parents, studentToParent };
 }
 
+// Short codes for elementary subjects
+const ELEM_SUBJECT_CODES: Record<string, string> = {
+  'Language Arts': 'LA', 'Mathematics': 'MA', 'Science & Technology': 'ST',
+  'Social Studies': 'SS', 'French': 'FR', 'Health & Physical Education': 'HPE', 'The Arts': 'ART',
+};
+
 function generateCourses(): CourseRow[] {
   const courses: CourseRow[] = [];
 
   for (let schoolIdx = 0; schoolIdx < SCHOOLS.length; schoolIdx++) {
-    for (const tmpl of COURSE_TEMPLATES) {
-      // Each course offered in one semester (alternate S1/S2 by index)
-      const semester = courses.length % 2 === 0 ? 'S1' : 'S2';
-      courses.push({
-        schoolIdx,
-        name: `${tmpl.code} - ${tmpl.name}`,
-        course_code: tmpl.code,
-        grade: tmpl.grade,
-        subject: tmpl.subject,
-        semester,
-      });
+    const school = SCHOOLS[schoolIdx];
+
+    if (school.type === 'secondary') {
+      // Secondary: use Ontario coded course templates
+      for (const tmpl of COURSE_TEMPLATES) {
+        const semester = courses.length % 2 === 0 ? 'S1' : 'S2';
+        courses.push({
+          schoolIdx,
+          name: `${tmpl.code} - ${tmpl.name}`,
+          course_code: tmpl.code,
+          grade: tmpl.grade,
+          subject: tmpl.subject,
+          semester,
+        });
+      }
+    } else {
+      // Elementary: one course per subject per grade (JK-8)
+      for (const grade of school.grades) {
+        for (const subj of ELEM_SUBJECTS) {
+          const code = `ELEM-${ELEM_SUBJECT_CODES[subj]}-${gradeLabel(grade)}`;
+          courses.push({
+            schoolIdx,
+            name: `Grade ${gradeLabel(grade)} ${subj}`,
+            course_code: code,
+            grade,
+            subject: subj,
+            semester: 'FY', // full year for elementary
+          });
+        }
+      }
     }
   }
 
@@ -487,13 +525,16 @@ function generateCourseMemberships(
     coursesBySchoolGrade.get(key)!.push(ci);
   }
 
-  // Student memberships: each student takes 4 courses from their grade at their school
+  // Student memberships:
+  //   Elementary: take ALL subjects (7 courses per grade)
+  //   Secondary: pick 4 courses from their grade
   for (let si = 0; si < students.length; si++) {
     const { schoolIdx, grade } = enrollments[si];
     const available = coursesBySchoolGrade.get(`${schoolIdx}-${grade}`) || [];
     if (available.length === 0) continue;
 
-    const selected = pickN(available, Math.min(4, available.length));
+    const isElem = SCHOOLS[schoolIdx].type === 'elementary';
+    const selected = isElem ? available : pickN(available, Math.min(4, available.length));
     for (const ci of selected) {
       const key = `${ci}-${si}`;
       if (!seen.has(key)) {
@@ -786,12 +827,13 @@ async function seedLarge(): Promise<void> {
 
   const schoolIds: string[] = [];
   for (const school of SCHOOLS) {
+    const gradesArr = `{${school.grades.join(',')}}`;
     const r = await pool.query(
       `INSERT INTO schools (board_id, name, school_code, grades)
-       VALUES ($1, $2, $3, '{9,10,11,12}')
-       ON CONFLICT (board_id, school_code) DO UPDATE SET name = EXCLUDED.name
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (board_id, school_code) DO UPDATE SET name = EXCLUDED.name, grades = EXCLUDED.grades
        RETURNING id`,
-      [boardId, school.name, school.code],
+      [boardId, school.name, school.code, gradesArr],
     );
     schoolIds.push(r.rows[0].id);
   }
