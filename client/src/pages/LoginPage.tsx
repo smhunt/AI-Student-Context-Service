@@ -1,7 +1,13 @@
-import { useState, type FormEvent } from 'react';
+import { useState, lazy, Suspense, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
+import { isClerkAuth } from '../auth/index.js';
 import { ChangelogModal, APP_VERSION } from '../components/changelog-modal.js';
+
+// Lazy-load Clerk SignIn — only bundled when Clerk is active
+const ClerkSignIn = isClerkAuth
+  ? lazy(() => import('@clerk/clerk-react').then((m) => ({ default: m.SignIn })))
+  : null;
 
 const DEMO_USERS = [
   { email: 'alex.johnson@tvdsb.on.ca', label: 'Alex Johnson', role: 'Student' },
@@ -12,7 +18,7 @@ const DEMO_USERS = [
   { email: 'james.wilson@tvdsb.on.ca', label: 'James Wilson', role: 'Board Admin' },
 ];
 
-export default function LoginPage() {
+function DevLoginForm() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -48,6 +54,79 @@ export default function LoginPage() {
   }
 
   return (
+    <>
+      <form onSubmit={handleSubmit} className="login-form">
+        {error && <div className="error-banner">{error}</div>}
+
+        <label>
+          <span>Email</span>
+          <input
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="you@tvdsb.on.ca"
+            required
+            autoFocus
+          />
+        </label>
+
+        <label>
+          <span>Password</span>
+          <input
+            type="password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            placeholder="Password"
+            required
+          />
+        </label>
+
+        <button type="submit" className="btn-primary" disabled={submitting}>
+          {submitting ? 'Signing in...' : 'Sign In'}
+        </button>
+      </form>
+
+      <div className="demo-section">
+        <p className="demo-label">Quick Login (Dev)</p>
+        <div className="demo-grid">
+          {DEMO_USERS.map(u => (
+            <button
+              key={u.email}
+              className="demo-btn"
+              onClick={() => handleQuickLogin(u.email)}
+              disabled={submitting}
+            >
+              <span className="demo-name">{u.label}</span>
+              <span className="demo-role">{u.role}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function ClerkLoginForm() {
+  if (!ClerkSignIn) return null;
+
+  return (
+    <div className="clerk-signin-container" style={{ display: 'flex', justifyContent: 'center', padding: '1rem 0' }}>
+      <Suspense fallback={<div>Loading sign-in...</div>}>
+        <ClerkSignIn
+          appearance={{
+            elements: {
+              rootBox: { width: '100%' },
+              card: { boxShadow: 'none', border: 'none' },
+            },
+          }}
+        />
+      </Suspense>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
     <div className="login-page">
       <div className="login-card">
         <div className="login-header">
@@ -55,53 +134,7 @@ export default function LoginPage() {
           <p className="subtitle">Thames Valley District School Board</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="login-form">
-          {error && <div className="error-banner">{error}</div>}
-
-          <label>
-            <span>Email</span>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="you@tvdsb.on.ca"
-              required
-              autoFocus
-            />
-          </label>
-
-          <label>
-            <span>Password</span>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="Password"
-              required
-            />
-          </label>
-
-          <button type="submit" className="btn-primary" disabled={submitting}>
-            {submitting ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
-
-        <div className="demo-section">
-          <p className="demo-label">Quick Login (Dev)</p>
-          <div className="demo-grid">
-            {DEMO_USERS.map(u => (
-              <button
-                key={u.email}
-                className="demo-btn"
-                onClick={() => handleQuickLogin(u.email)}
-                disabled={submitting}
-              >
-                <span className="demo-name">{u.label}</span>
-                <span className="demo-role">{u.role}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+        {isClerkAuth ? <ClerkLoginForm /> : <DevLoginForm />}
 
         <div className="version-tag" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
           <ChangelogModal />

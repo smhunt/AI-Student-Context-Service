@@ -18,8 +18,14 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
-// Dev login — email + password. SSO is Sprint 7.
+// Dev login — email + password. Disabled when using external SSO in production.
 router.post('/api/auth/dev-login', async (req, res) => {
+  const provider = getAuthProvider();
+  if (provider.name !== 'dev' && process.env.NODE_ENV === 'production') {
+    res.status(404).json({ error: 'Dev login is disabled. Use SSO.' });
+    return;
+  }
+
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Invalid request', details: parsed.error.issues });
