@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  mcp-http:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    ports:
+      - '3095:3095'
+    environment:
+      - DATABASE_URL=postgresql://sc_dev:dev_password@db:5432/studentcontext
+      - MCP_HTTP_ENABLED=true
+      - MCP_HTTP_PORT=3095
+      - AUTH_PROVIDER=${AUTH_PROVIDER:-dev}
+      - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret-studentcontext-2026}
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LLM_PROVIDER=${LLM_PROVIDER:-claude}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      - POSTGRES_USER=sc_dev
+      - POSTGRES_PASSWORD=dev_password
+      - POSTGRES_DB=studentcontext
+    volumes:
+      - mcp_pgdata:/var/lib/postgresql/data
+    ports:
+      - '5438:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U sc_dev -d studentcontext']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  mcp_pgdata:

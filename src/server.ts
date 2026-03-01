@@ -39,6 +39,15 @@ https.createServer(sslOpts, app).listen(config.port, '0.0.0.0', () => {
   ║  CORS: ${config.corsOrigin.padEnd(37)}║
   ╚══════════════════════════════════════════════╝
   `);
+
+  // Start MCP HTTP server if enabled
+  if (config.mcpHttpEnabled) {
+    import('./mcp/http-server.js').then(({ startMcpHttpServer }) => {
+      startMcpHttpServer();
+    }).catch((err) => {
+      console.error('Failed to start MCP HTTP server:', err);
+    });
+  }
 });
 
 export default app;

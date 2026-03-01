@@ -4,6 +4,8 @@ import { handleSearchContext } from './tools/search-context.js';
 import { handleGetPermissions } from './tools/get-permissions.js';
 import { handleCheckConsent } from './tools/check-consent.js';
 import { handleIngestDocument } from './tools/ingest-document.js';
+import { handleContextAugmentedChat } from './tools/chat.js';
+import { handleBulkSearch } from './tools/bulk-search.js';
 import { readStudentContext } from './resources/student-context.js';
 import { readAuditLogs } from './resources/audit-logs.js';
 import { readSessions } from './resources/sessions.js';
@@ -11,7 +13,7 @@ import { readSessions } from './resources/sessions.js';
 export function createMcpServer(): McpServer {
   const server = new McpServer({
     name: 'studentcontext-ai',
-    version: '0.9.0',
+    version: '1.0.0',
   });
 
   // --- Tools ---
@@ -63,6 +65,33 @@ export function createMcpServer(): McpServer {
       course_id: z.string().optional().describe('Optional course ID'),
     },
     async (args) => handleIngestDocument(args),
+  );
+
+  server.tool(
+    'context_augmented_chat',
+    'Full RAG pipeline as a single tool call: query → permission check → consent check → embed → vector search → LLM → audit → response. Equivalent to the /api/chat/message endpoint.',
+    {
+      user_id: z.string().describe('Authenticated user ID'),
+      board_id: z.string().describe('Board ID for multi-tenant scoping'),
+      query: z.string().describe('User message / question'),
+      student_id: z.string().optional().describe('Target student ID (defaults to self for students)'),
+      session_id: z.string().optional().describe('Existing chat session ID to continue conversation'),
+      max_chunks: z.number().int().min(1).max(20).optional().describe('Maximum context chunks (default: 5)'),
+    },
+    async (args) => handleContextAugmentedChat(args),
+  );
+
+  server.tool(
+    'bulk_search',
+    'Search across all students in the caller\'s permission scope. For staff aggregation use cases like class-wide insights or trending topics.',
+    {
+      user_id: z.string().describe('Authenticated user ID performing the search'),
+      board_id: z.string().describe('Board ID for multi-tenant scoping'),
+      query: z.string().describe('Natural language query to search against student records'),
+      max_students: z.number().int().min(1).max(50).optional().describe('Maximum students to search (default: 20)'),
+      max_chunks_per_student: z.number().int().min(1).max(10).optional().describe('Max chunks per student (default: 3)'),
+    },
+    async (args) => handleBulkSearch(args),
   );
 
   // --- Resources ---

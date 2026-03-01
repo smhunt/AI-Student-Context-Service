@@ -3,8 +3,8 @@
 **StudentContext AI** exposes its Context Engine as a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. This allows Claude Desktop, Claude Code, and any MCP-compatible client to query student academic data, check permissions and consent, and ingest documents -- all through the same permission-scoped RAG pipeline that powers the web application.
 
 **Server name:** `studentcontext-ai`
-**Version:** `0.9.0`
-**Transport:** stdio
+**Version:** `1.0.0`
+**Transport:** stdio (Claude Desktop) or HTTP/SSE (network deployment)
 **Company:** EcoWorks Web Architecture Inc.
 
 ---
@@ -55,6 +55,28 @@ npm run mcp
 ```
 
 The server starts on **stdio** transport. It does not open a network port -- communication happens over stdin/stdout, which is the standard MCP transport for local integrations.
+
+### HTTP/SSE Transport (Network Deployment)
+
+For embedding the context engine into other systems, use the HTTP/SSE transport:
+
+```bash
+# Via environment variable
+MCP_HTTP_ENABLED=true MCP_HTTP_PORT=3095 npm run dev
+
+# Standalone
+npx tsx src/mcp/http-server.ts
+
+# Docker
+docker compose -f docker-compose.mcp.yml up
+```
+
+The HTTP server exposes:
+- `GET /sse` — Establish SSE connection (requires Bearer token)
+- `POST /messages?sessionId=...` — Send JSON-RPC messages (requires Bearer token)
+- `GET /health` — Health check (no auth)
+
+Auth uses the same `AuthProvider` as the main API (dev JWT, Clerk, Entra, Google).
 
 On successful startup, the server logs to stderr:
 
@@ -117,7 +139,7 @@ Replace `/path/to/AI-Student-Context-Service` with the actual absolute path to t
 
 ## Tools Reference
 
-The MCP server exposes four tools. All tool responses return JSON content as a `text` content block. Error responses include `isError: true`.
+The MCP server exposes six tools. All tool responses return JSON content as a `text` content block. Error responses include `isError: true`.
 
 ### `search_student_context`
 
@@ -311,6 +333,72 @@ Ingest a document into the student context system. Handles deduplication (SHA-25
 ```
 
 If the document content matches an existing document's SHA-256 hash, the response returns `duplicate: true` and no new chunks or embeddings are created.
+
+---
+
+### `context_augmented_chat`
+
+Full RAG pipeline as a single tool call. Equivalent to `POST /api/chat/message` but accessible via MCP. Routes through the API key broker for billing.
+
+#### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `user_id` | `string` (UUID) | Yes | Authenticated user ID |
+| `board_id` | `string` (UUID) | Yes | Board ID for multi-tenant scoping |
+| `query` | `string` | Yes | User message / question |
+| `student_id` | `string` (UUID) | No | Target student ID (defaults to self for students) |
+| `session_id` | `string` (UUID) | No | Existing chat session to continue |
+| `max_chunks` | `number` (1-20) | No | Maximum context chunks. Default: `5` |
+
+#### Response
+
+```json
+{
+  "response": "Based on Alex's recent math assessments...",
+  "session_id": "uuid",
+  "message_id": "uuid",
+  "model": "claude-sonnet-4-20250514",
+  "chunks_used": 3,
+  "token_count_input": 1200,
+  "token_count_output": 450,
+  "latency_ms": 2100
+}
+```
+
+---
+
+### `bulk_search`
+
+Search across all students in the caller's permission scope. For staff aggregation use cases.
+
+#### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `user_id` | `string` (UUID) | Yes | Authenticated user ID |
+| `board_id` | `string` (UUID) | Yes | Board ID for multi-tenant scoping |
+| `query` | `string` | Yes | Search query |
+| `max_students` | `number` (1-50) | No | Max students to search. Default: `20` |
+| `max_chunks_per_student` | `number` (1-10) | No | Max chunks per student. Default: `3` |
+
+#### Response
+
+```json
+{
+  "query": "struggling with fractions",
+  "students_searched": 20,
+  "students_with_results": 8,
+  "results": [
+    {
+      "student_id": "uuid",
+      "chunks": [
+        { "content": "...", "source": "google_classroom_grade", "similarity": 0.91 }
+      ]
+    }
+  ]
+}
+```
 
 ---
 
@@ -516,11 +604,16 @@ The MCP server is a thin protocol adapter. It does not contain business logic --
 src/mcp/
   index.ts                          # Entry point -- loads env, creates server, connects stdio transport
   server.ts                         # Server factory -- registers all tools and resources
+  http-server.ts                    # HTTP/SSE transport for network deployment
   tools/
     search-context.ts               # search_student_context tool handler
     get-permissions.ts              # get_permission_scope tool handler
     check-consent.ts                # check_consent tool handler
     ingest-document.ts              # ingest_document tool handler
+    chat.ts                         # context_augmented_chat tool handler
+    bulk-search.ts                  # bulk_search tool handler
+  middleware/
+    mcp-auth.ts                     # Bearer token auth for HTTP transport
   resources/
     student-context.ts              # studentcontext://students/{id}/context
     audit-logs.ts                   # studentcontext://audit/{board_id}
