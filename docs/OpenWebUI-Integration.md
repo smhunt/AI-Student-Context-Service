@@ -6,6 +6,36 @@ StudentContext AI exposes an OpenAI-compatible API that allows boards to use [Op
 
 **Important**: The custom StudentContext UI has permission scoping and consent flows built in. The OpenAI-compat layer provides flexibility but does not replicate all UI features (student selector, consent management, etc.).
 
+## Benefits of OpenAI-Compatible Chat Integration
+
+Some boards have already invested in deploying Open WebUI or similar OpenAI-compatible chat frontends for their staff. Others have built custom internal tools that speak the OpenAI API format. Requiring these boards to abandon their existing chat infrastructure and adopt a new web application would create unnecessary friction and delay adoption.
+
+StudentContext AI's OpenAI-compatible API layer solves this by making the full context engine available through the industry-standard `/v1/chat/completions` endpoint.
+
+### Protect Existing Chat UI Investments
+
+A board that has already deployed Open WebUI, configured it with custom themes, trained staff on its interface, and integrated it into their workflow does not need to replace it. By pointing Open WebUI's API base URL at StudentContext AI's `/v1` endpoint, the board's existing chat UI gains student-aware, context-augmented AI responses immediately. Staff continue using the interface they already know -- the only difference is that responses are now grounded in real student data.
+
+### Permission Scoping Through Any Frontend
+
+The critical differentiator is that StudentContext AI's permission model is enforced at the API level, not the UI level. When a teacher sends a message through Open WebUI, the API resolves their role, determines which students they can access, verifies parental consent, retrieves relevant context from the vector database, and routes the request through the LLM gateway with full audit logging -- exactly as if they had used the native StudentContext UI.
+
+This means boards do not sacrifice security or compliance by using a third-party chat frontend. The same RBAC rules, consent checks, and audit trails apply regardless of which UI the request originates from.
+
+### Streaming Support for Responsive Interaction
+
+The compat layer supports both standard request-response and Server-Sent Events (SSE) streaming. When `stream: true` is set in the request, responses are delivered token-by-token, providing the same responsive typing experience that users expect from modern AI chat interfaces. Open WebUI handles SSE streaming natively, so the experience is seamless.
+
+### Multi-Model Selection
+
+The `/v1/models` endpoint advertises all LLM providers configured for the board. If a board has enabled Claude, GPT-4o, and Gemini, Open WebUI will display all three as selectable models. Staff can choose the most appropriate model for their task -- or the board can restrict the list to a single approved provider. All requests route through the API key broker with full token tracking and cost accounting regardless of which model is selected.
+
+### A Path from Generic AI to Student-Aware AI
+
+Many boards are already experimenting with generic AI chat tools that lack any student context. The OpenAI-compatible API provides a low-friction migration path: the board keeps their existing chat UI, swaps the API endpoint from a generic OpenAI proxy to StudentContext AI's context engine, and immediately upgrades from generic responses to student-aware, permission-scoped, consent-verified, audit-logged AI interactions.
+
+No new software to deploy on staff workstations. No new login flow to learn. No new interface to navigate. Just better, more relevant AI responses flowing through the same tool staff already use.
+
 ## Architecture
 
 ```

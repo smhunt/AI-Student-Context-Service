@@ -1,6 +1,6 @@
 # StudentContext AI -- Architecture Documentation
 
-**Version:** 0.12.0
+**Version:** 1.0.0
 **Company:** EcoWorks Web Architecture Inc.
 **Target Customer:** Ontario school boards (starting with Thames Valley DSB)
 **Repository:** AI-Student-Context-Service
@@ -10,7 +10,8 @@
 ## Table of Contents
 
 1. [System Overview](#system-overview)
-2. [Architecture Diagram](#architecture-diagram)
+2. [Why StudentContext AI?](#why-studentcontext-ai)
+3. [Architecture Diagram](#architecture-diagram)
 3. [Data Flow -- Chat Request](#data-flow----chat-request)
 4. [Tech Stack](#tech-stack)
 5. [Project Structure](#project-structure)
@@ -40,6 +41,66 @@ chat message, the query is embedded into a vector, similar document chunks are r
 from PostgreSQL (pgvector), the user's permission scope and parental consent are enforced,
 and the retrieved context is injected into a system prompt before being sent to the Claude
 LLM. Every context retrieval is logged for FIPPA compliance auditing.
+
+---
+
+## Why StudentContext AI?
+
+Ontario school boards are under growing pressure to integrate AI tools into classrooms while maintaining strict compliance with FIPPA, PHIPA, the Ontario Education Act, and board-level privacy policies. Most commercially available AI chatbots operate without any knowledge of the student sitting in front of them -- they provide generic responses that ignore a student's actual academic history, learning needs, and support plans.
+
+StudentContext AI bridges this gap. It is not a standalone AI product -- it is a **middleware layer** that augments board-approved LLM tools with each student's real academic context, filtered through a permission model that enforces the same access boundaries educators already follow in their daily work.
+
+### For Students: A Tutor That Actually Knows You
+
+A generic AI chatbot answers "How am I doing in math?" with textbook advice. StudentContext AI answers with the student's actual grades, assignment feedback, and teacher comments from Google Classroom and the SIS. A Grade 10 student at Medway High School can ask about their MPM2D progress and receive a response grounded in their Unit 3 assessment score, their Term 1 report card narrative, and their midterm submission -- not a hallucinated guess.
+
+Students receive age-appropriate, encouraging responses that never expose raw grades or sensitive data. The AI acts as a personalized learning companion that understands what they have studied, where they have shown strength, and where they need additional practice -- all without requiring a teacher to manually brief the system.
+
+### For Teachers: Hours Returned to Teaching
+
+Ontario teachers spend an estimated 10-15 hours per reporting period writing report card comments for each class. StudentContext AI generates Growing Success-aligned draft comments in seconds, grounded in the student's actual assignments, grades, and class participation data from Google Classroom. A teacher can review, adjust the tone, and finalize a comment that would have otherwise taken 15-20 minutes to write from scratch.
+
+Beyond report cards, teachers gain instant class-level insights: which students have data coverage gaps, which sources have been synced, and how many document chunks are available per student. The Staff Portal provides a student selector scoped to the teacher's actual course roster -- no risk of accidentally viewing another teacher's students.
+
+A supply teacher covering a class gets need-to-know context about each student's current progress, limited to standard-sensitivity data and only for the assigned class on that day, so they can teach effectively without access to sensitive records.
+
+### For Guidance Counsellors: The Complete Student Picture
+
+Guidance counsellors often spend significant time requesting and reviewing Ontario Student Records (OSRs), cross-referencing report cards, IEPs, EQAO scores, and attendance patterns to build a holistic picture of a student's trajectory. StudentContext AI provides this picture instantly.
+
+A counsellor can ask, "What is this student's academic trajectory over the last four years?" and receive a response that synthesizes report cards, transcripts, attendance records, IEPs, and guidance notes -- all within a single conversation. Because counsellors are assigned the `restricted` sensitivity level, they see the full depth of a student's record, including sensitive and restricted documents that teachers cannot access.
+
+Every context retrieval is logged in the audit trail, providing the counsellor with a defensible record of what data was accessed and when -- critical for professional accountability.
+
+### For Parents: Transparency and Control
+
+Parents are the gatekeepers of their child's data in StudentContext AI. The Parent Consent Portal allows parents to grant or revoke AI context consent at any time, with granular control over which data sources the system may use. A parent can allow Google Classroom grades but exclude IEP data, or revoke consent entirely with a single click.
+
+When consent is granted, parents can use the student chat interface to ask about their child's progress and receive plain-language, jargon-free responses grounded in actual academic records. The system never exposes sensitive data to parents -- only standard-sensitivity sources are included.
+
+This model ensures compliance with Ontario's parental consent requirements under the Education Act and FIPPA, while giving families genuine visibility into how AI is being used with their child's data.
+
+### For School Boards: Compliance, Cost Control, and Vendor Freedom
+
+**Privacy and compliance.** StudentContext AI was designed from the ground up for Ontario's regulatory environment. Every context retrieval generates an audit entry. Multi-tenant isolation ensures Board A cannot access Board B's data -- enforced at the database level with row-level security policies and `board_id` scoping on every table. No student data is stored on LLM provider servers; context is passed per-request and never persists outside the board's database.
+
+**Cost control.** The LLM Gateway and API Key Broker model means EcoWorks holds the master LLM keys and proxies requests with configurable markup. Boards set monthly token budgets with 90% warning thresholds and hard 100% cutoffs. Per-request cost tracking provides complete transparency into AI spending per school, per role, per provider.
+
+**Vendor flexibility.** Boards are not locked into a single LLM vendor. The gateway supports Claude, GPT-4o, Gemini, Llama (via Groq), and Mistral. A board can start with Claude today and switch to a locally-hosted model tomorrow without changing a single line of application code. The same flexibility applies to identity providers (Clerk, Entra ID, Google), Student Information Systems (Aspen, any OneRoster 1.1-compliant SIS), and chat frontends (native UI, OpenWebUI, MCP-enabled tools).
+
+**OECM alignment.** With 38+ Ontario boards already using Aspen via the OECM contract, StudentContext AI's native Aspen and OneRoster integration means deployment requires only API credentials -- no custom data pipelines or ETL jobs.
+
+### For IT Departments: Deployable, Maintainable, Extensible
+
+**Simple deployment.** The entire stack runs as Docker containers: PostgreSQL with pgvector, the Node.js API server, and optionally the MCP HTTP server. A board IT team can have a development instance running in under an hour.
+
+**Multi-tenant by default.** A single deployment serves all schools within a board. Adding a new school requires only a database entry, not a new server instance. Row-level security ensures data isolation without operational overhead.
+
+**SIS integration without middleware.** StudentContext AI connects directly to Aspen via OAuth 2.0 client credentials or the OneRoster 1.1 standard. Nightly batch syncs and webhook-driven incremental syncs keep data current without manual CSV imports or FTP transfers.
+
+**Identity provider flexibility.** Boards using Microsoft 365 can authenticate via Entra ID. Google Workspace boards can use Google Identity. Boards with existing Clerk deployments can use Clerk. The pluggable `AuthProvider` interface means adding a new identity source is a single TypeScript class -- no refactoring of the application.
+
+**MCP embeddability.** The context engine can be embedded into any MCP-compatible tool (Claude Desktop, Claude Code, custom applications) as a stdio or HTTP/SSE server. IT teams can expose student context to staff tools without building a separate frontend.
 
 ---
 

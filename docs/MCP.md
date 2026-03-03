@@ -9,6 +9,50 @@
 
 ---
 
+## Why MCP Integration Matters
+
+The Model Context Protocol (MCP) is an open standard that allows AI assistants to access external data sources and tools. For StudentContext AI, MCP support transforms the context engine from a web-only service into an embeddable capability that can operate inside any MCP-compatible environment -- including Claude Desktop, Claude Code, custom desktop applications, and enterprise workflow tools.
+
+This has profound implications for how educators interact with student data.
+
+### Student Context in the Tools Educators Already Use
+
+Rather than requiring staff to open a separate web application to access student information, MCP allows the context engine to surface inside the tools they are already working in. A guidance counsellor using Claude Desktop can ask about a student's academic trajectory and receive a response grounded in real SIS data, report cards, and IEP records -- without leaving their desktop environment. A teacher using Claude Code to build lesson materials can pull in class-level insights about which students are struggling with specific concepts.
+
+The key insight is that StudentContext AI does not need to own the user interface. It can power student-aware AI responses in any environment that speaks MCP.
+
+### Full Permission Model, Even in External Tools
+
+MCP access does not bypass any security controls. Every tool call through the MCP server goes through the same RBAC permission pipeline, parental consent verification, and audit logging as the web API. A teacher querying student context through Claude Desktop sees only their current course roster at standard and sensitive sensitivity levels. A principal sees all school students at all sensitivity levels. A parent sees only their own children's standard data.
+
+This means IT departments can enable MCP access for staff without creating a separate security model. The permission rules are identical regardless of whether the query comes from the web UI, the REST API, or an MCP client.
+
+### No Vendor Lock-In on AI Tooling
+
+MCP is an open protocol. Today, the primary MCP clients are Claude Desktop and Claude Code, but the ecosystem is growing rapidly. Any application that implements MCP client support -- including custom internal tools, learning management systems, or third-party education platforms -- can connect to the StudentContext AI context engine.
+
+This means a board is not locked into Anthropic's tools or EcoWorks' web frontend. The context engine is a reusable service that any authorized application can consume. If a board later adopts a different AI assistant that supports MCP, the context engine works immediately -- no migration, no new API integration, no code changes.
+
+### Two Deployment Models for Different Needs
+
+The MCP server supports two transport modes:
+
+- **stdio** for local desktop integration: Claude Desktop launches the MCP server as a child process. Communication happens over stdin/stdout. No network ports are opened. This is ideal for individual staff members who want context-aware AI on their workstation.
+
+- **HTTP/SSE** for network deployment: The MCP server runs as a standalone service (containerized with Docker) and accepts authenticated connections over HTTPS. This is ideal for centralized deployments where multiple clients connect to a shared context engine, and for embedding context capabilities into web-based tools.
+
+Both modes share the same service layer, the same permission model, and the same audit trail. The only difference is the transport mechanism.
+
+### Practical Scenarios
+
+- A **principal** opens Claude Desktop and asks: "Which Grade 9 students at my school have attendance rates below 80% this semester?" The MCP server queries the vectorized attendance records, scoped to the principal's school, and returns a grounded response.
+
+- A **teacher** using Claude Code asks: "Generate a study guide for my MPM2D class focusing on areas where students scored below 70% on the Unit 3 assessment." The MCP server retrieves grade data for all students in that course section and provides targeted content recommendations.
+
+- A **board IT team** deploys the MCP HTTP server alongside their internal staff portal. Staff tools can call the context engine programmatically to populate dashboards, generate reports, or power custom AI workflows -- all with full permission scoping and audit logging.
+
+---
+
 ## Table of Contents
 
 1. [Quick Start](#quick-start)

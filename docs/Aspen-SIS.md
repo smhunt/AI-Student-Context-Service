@@ -1,10 +1,46 @@
-# Aspen SIS Integration — Technical Architecture
+# Aspen SIS Integration -- Technical Architecture
 
 ## Overview
 
 Aspen (formerly X2 by Follett) is the Student Information System used by 38+ Ontario school boards via an OECM (Ontario Education Collaborative Marketplace) contract. It replaced the legacy Trillium system starting in 2019.
 
 StudentContext AI integrates with Aspen via its REST API and the OneRoster 1.1 standard.
+
+## Benefits of SIS Integration
+
+The Student Information System is the authoritative source of truth for student demographics, academic records, attendance, Individual Education Plans, and assessment results in every Ontario school board. Without SIS integration, any AI tool that claims to "know" a student is operating on incomplete or manually-entered data. StudentContext AI's direct integration with Aspen eliminates this gap.
+
+### 38+ Ontario Boards Ready on Day One
+
+Because 38+ Ontario boards already use Aspen through the OECM contract, StudentContext AI does not require boards to adopt new data infrastructure. The integration uses the same OAuth 2.0 client credentials and REST API endpoints that Aspen already exposes. Deployment for a new board requires only API credentials from the Fujitsu-managed Aspen instance -- no custom data exports, no CSV pipelines, no FTP transfers, and no middleware ETL jobs.
+
+This means a board can move from contract signing to live student data ingestion in days rather than months.
+
+### Automatic, Continuous Data Sync
+
+Manual data entry is the enemy of accurate AI context. StudentContext AI runs nightly batch syncs that pull the latest report cards, transcripts, attendance records, IEPs, and EQAO results for every student in the board. When Aspen data changes between nightly syncs, webhook-driven incremental syncs ensure the context engine reflects the update within minutes.
+
+Every sync is idempotent and deduplicated. If the same report card is synced twice, the SHA-256 content hash prevents duplicate document creation. This means syncs can run as frequently as needed without inflating the vector database or generating redundant embeddings.
+
+### Ontario-Specific Data Structures Understood Natively
+
+StudentContext AI maps Aspen data to Ontario-specific document structures: Ontario Student Transcripts (OSTs), Growing Success report cards, IEPs conforming to PPM 8, EQAO assessment results, and attendance records aligned with Education Act s.21 requirements. Ontario Education Numbers (OENs) are used as the canonical student identifier for cross-system matching.
+
+This is not a generic SIS connector that requires custom field mapping for each board. The Aspen integration understands Ontario's educational data structures out of the box.
+
+### Sensitivity-Aware Ingestion
+
+Not all SIS data carries the same privacy weight. Report cards and transcripts are classified as `standard` sensitivity -- accessible to teachers, guidance counsellors, principals, and parents. IEPs and guidance notes are classified as `sensitive` or `restricted`, accessible only to roles that the Ontario Education Act and board policy authorize. StudentContext AI applies these sensitivity classifications automatically during ingestion, ensuring that the permission model is enforced from the moment data enters the system.
+
+### OneRoster 1.1 for Vendor-Agnostic Compatibility
+
+While the Aspen-specific REST API provides the deepest integration, StudentContext AI also supports the IMS Global OneRoster 1.1 standard. This means the same integration architecture works with any OneRoster-compliant SIS -- including PowerSchool, Veracross, and other systems used by Ontario Catholic boards, private schools, and boards outside Ontario.
+
+A board evaluating StudentContext AI does not need to commit to Aspen. If the board later migrates from Aspen to another SIS that supports OneRoster, the switch requires only updating environment variables -- no code changes, no data migration, no re-deployment.
+
+### Reduced Administrative Burden
+
+Without SIS integration, keeping an AI context engine current requires someone to manually export data, format it, and upload it. For a board with 25,000 students across 40 schools, this is operationally impossible at any meaningful frequency. Automated SIS sync makes the context engine self-maintaining: as teachers enter grades, as attendance is recorded, as IEPs are updated -- the AI's knowledge base reflects these changes automatically.
 
 ## Aspen Technical Stack
 

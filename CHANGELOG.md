@@ -1,5 +1,15 @@
 # Changelog
 
+## About This Project
+
+**StudentContext AI** is a middleware SaaS developed by [EcoWorks Web Architecture Inc.](https://ecoworks.ca) that transforms school-board-approved LLM chatbots into personalized learning companions for Ontario school boards. Rather than building yet another standalone AI tool, StudentContext AI augments existing board-approved systems with each student's real academic context -- assignments, grades, report cards, attendance records, IEPs, and EQAO results -- all filtered through a role-based permission model that enforces the same access boundaries educators follow in their daily work.
+
+The system integrates with Aspen SIS (38+ Ontario boards via OECM contract), Google Classroom, and multiple LLM providers (Claude, GPT-4o, Gemini, Llama, Mistral). It supports pluggable identity providers (Clerk, Entra ID, Google), an MCP server for embedding into desktop AI tools, and an OpenAI-compatible API for third-party chat frontends. Every data access is consent-gated and audit-logged for FIPPA, PHIPA, and Ontario Education Act compliance.
+
+The target deployment is Thames Valley District School Board (TVDSB), with architecture designed for any Ontario board running Aspen or a OneRoster 1.1-compliant SIS.
+
+---
+
 All notable changes to StudentContext AI are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),

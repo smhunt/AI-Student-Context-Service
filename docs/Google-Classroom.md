@@ -4,6 +4,40 @@
 
 StudentContext AI syncs student academic data from Google Classroom via the Google Classroom API. This provides real-time access to assignments, submissions, grades, and teacher comments.
 
+## Benefits of Google Classroom Integration
+
+Google Workspace for Education is the dominant classroom platform across Ontario school boards. For boards using Google Classroom, this integration transforms a static LMS into a live data source that feeds the AI context engine -- giving every chat response, report card comment, and staff insight a grounding in what is actually happening in the classroom right now.
+
+### Real-Time Assignment and Grade Awareness
+
+When a teacher posts a new assignment in Google Classroom, StudentContext AI ingests the assignment description, due date, and point value. When a student submits their work, the submission details are ingested. When the teacher grades it, the grade and any rubric scores are captured. This means the AI's knowledge of a student's academic performance is as current as the teacher's gradebook.
+
+A student asking "What should I focus on for my upcoming test?" receives advice grounded in their actual assignment scores and submission history -- not generic study tips. A teacher generating a report card comment gets a draft that references the student's real performance trajectory across the semester, not a placeholder narrative.
+
+### Elimination of Manual Data Entry
+
+Without Google Classroom integration, keeping the AI context engine informed about daily classroom activity would require teachers to manually enter information into a separate system. This is unrealistic -- teachers already face significant administrative workload. By syncing directly from Google Classroom, StudentContext AI captures classroom data as a byproduct of the work teachers are already doing. No additional data entry, no duplicate workflows, no change in teacher behavior required.
+
+### Board-Wide Deployment with a Single OAuth Consent
+
+For board-wide deployment, the Google Workspace administrator grants domain-wide delegation to the StudentContext AI OAuth application and pre-authorizes the required read-only scopes. After this one-time administrative action, no individual teacher consent is needed. The sync runs silently across all courses in the board's Google Classroom instance.
+
+This centralized consent model aligns with how Ontario boards manage Google Workspace: the IT department controls application access at the domain level, and individual teachers do not need to approve third-party integrations on a per-course basis.
+
+### Complementary to SIS Data
+
+Google Classroom captures what happens in the classroom day-to-day: assignments, submissions, grades, and teacher comments. The SIS (Aspen) captures the formal academic record: report cards, transcripts, attendance, IEPs, and EQAO results. Together, these two data sources give the context engine a complete picture of each student -- from the macro-level academic trajectory down to individual assignment performance.
+
+A guidance counsellor asking about a student's math progress sees both the Term 1 report card from Aspen and the individual unit assessment scores from Google Classroom. A teacher generating a report card comment has access to the full semester's assignment data, not just their own recollection of a student's work.
+
+### Webhook-Driven Incremental Updates
+
+Beyond the initial full sync, Google Classroom supports push notifications via Google Cloud Pub/Sub. When a student turns in an assignment, when a teacher posts a grade, or when a course roster changes, the webhook triggers an incremental sync for the affected course and student. This keeps the context engine current throughout the school day without running expensive full syncs.
+
+### Privacy-Respecting Read-Only Access
+
+The integration requests only read-only OAuth scopes. StudentContext AI never modifies, creates, or deletes anything in Google Classroom. It reads course information, assignment details, submission states, and grades -- nothing more. The board's Google Classroom data remains entirely under the board's control, and the integration can be revoked at the Google Workspace admin level at any time.
+
 ## OAuth 2.0 Flow
 
 ```

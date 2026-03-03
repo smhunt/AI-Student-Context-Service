@@ -2,6 +2,24 @@
 
 StudentContext AI uses a pluggable authentication system. This document describes the `AuthProvider` interface, available implementations, and how to swap between them.
 
+## Why Pluggable Authentication Matters
+
+Ontario school boards have made significant investments in identity infrastructure. Some boards run Microsoft 365 with Azure Active Directory (Entra ID). Others use Google Workspace for Education. A growing number have adopted modern identity platforms like Clerk for staff-facing applications. Requiring boards to adopt a new identity provider just to deploy a student context tool would be a non-starter -- it would create duplicate credential management, confuse users, and violate the SSO expectations that boards have spent years establishing.
+
+StudentContext AI's pluggable `AuthProvider` architecture eliminates this barrier entirely.
+
+**Protect existing identity investments.** A board that has spent three years rolling out Entra ID with conditional access policies, MFA enrollment, and security group management does not need to replicate any of that work. StudentContext AI plugs directly into their existing Entra ID tenant. Teachers sign in with the same credentials they use for Outlook, Teams, and SharePoint. There is no separate password to manage, no additional MFA enrollment, and no new account provisioning workflow.
+
+**Single sign-on from day one.** Because the auth layer delegates to the board's own identity provider, users experience true SSO. A teacher already signed into their Google Workspace session can access StudentContext AI without re-authenticating. A staff member logged into their Microsoft 365 environment gets the same seamless experience. This reduces friction, increases adoption, and eliminates the support tickets that come with yet-another-login.
+
+**Zero vendor lock-in on identity.** Boards change identity providers. A board that starts with Google Workspace may migrate to Microsoft 365 as part of a broader IT strategy. With StudentContext AI, this change requires updating two environment variables (`AUTH_PROVIDER` and the provider-specific keys) and restarting the service. No data migration, no user re-provisioning, no code changes. The same applies in reverse.
+
+**Security posture inheritance.** The board's existing conditional access policies, IP restrictions, MFA requirements, and session management rules apply automatically. If the board's Entra ID tenant requires MFA for all staff, StudentContext AI inherits that requirement without any additional configuration. If the board revokes a teacher's Google Workspace account, that teacher immediately loses access to StudentContext AI as well.
+
+**Simplified compliance reporting.** When boards audit authentication and access controls for FIPPA compliance, StudentContext AI's auth layer points directly to the board's own identity infrastructure. There is no separate user database to audit, no separate password policy to document, and no separate MFA configuration to verify. The board's existing identity compliance posture extends seamlessly to the AI context system.
+
+**Rapid pilot deployment.** For initial pilots and development, the built-in `DevAuthProvider` allows boards to evaluate the system without any identity integration at all. Seed users with pre-set passwords enable immediate testing across all roles -- student, teacher, guidance counsellor, principal, parent, and board admin. When the pilot transitions to production, swapping to the board's real identity provider is a configuration change, not a development project.
+
 ## Architecture
 
 ```

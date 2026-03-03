@@ -6,6 +6,24 @@
 
 ---
 
+## What This API Enables
+
+The StudentContext AI API provides programmatic access to a complete, permission-scoped student context engine. For integrators, this means any board-approved application can gain student-aware AI capabilities without building its own RAG pipeline, permission model, or consent management system.
+
+**Context-augmented AI in any application.** A board's existing learning management system, student dashboard, or internal tool can send a single `POST /api/chat/message` request and receive a response from a major LLM (Claude, GPT-4o, Gemini, or others) that has been augmented with the relevant student's actual academic records -- assignments, grades, report cards, attendance, IEPs, and more. The API handles embedding, vector search, permission scoping, consent verification, and audit logging automatically.
+
+**Role-based access enforcement.** Every API request is scoped by the authenticated user's role. A teacher calling the chat endpoint about a student will receive context limited to their course roster and standard/sensitive data. A guidance counsellor calling the same endpoint for the same student will receive a broader scope including restricted records. A parent will see only their own child's standard-sensitivity data. The integrator does not need to implement these rules -- the API enforces them.
+
+**Report card automation at scale.** The `POST /api/staff/report-comments` endpoint generates Ontario Growing Success-aligned report card comments grounded in actual student data. A board's report card system can call this endpoint for every student-course pair and receive draft comments that reflect real assignment performance, class participation, and learning skill observations -- saving teachers an estimated 10-15 hours per reporting period per class.
+
+**Compliance built in.** Every context retrieval generates an audit log entry. The `GET /api/admin/audit` endpoint exposes the full audit trail for FIPPA compliance reviews. Parental consent is verified on every request -- if consent has not been granted, the API returns a clear error rather than silently omitting context.
+
+**Cost visibility.** The `GET /api/admin/usage` endpoint provides per-provider, per-model token usage and cost estimates. Board administrators can track AI spending by school, by role, and by date range without external analytics tools.
+
+**Standard integration patterns.** The API also exposes an OpenAI-compatible endpoint (`POST /v1/chat/completions`) for boards that want to use third-party chat interfaces like Open WebUI while maintaining full permission scoping and billing. For Claude Desktop and MCP-compatible tools, the same context engine is available via the MCP server protocol.
+
+---
+
 ## Table of Contents
 
 1. [Authentication](#authentication)

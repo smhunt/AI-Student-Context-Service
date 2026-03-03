@@ -95,61 +95,80 @@ export const CHANGELOG = [
 
 export const HOW_IT_WORKS = [
   {
-    title: 'Secure Login',
-    description: 'Authenticate via your school board credentials. Role-based access controls ensure you only see data appropriate for your role.',
+    title: 'Sign In with Your Board Credentials',
+    description: 'Use the same login you already use for your school board systems. StudentContext AI plugs into your board\'s identity provider (Clerk, Microsoft Entra ID, or Google Workspace) so there is no separate password to remember and your board\'s security policies apply automatically.',
     icon: 'lock',
   },
   {
-    title: 'Ask a Question',
-    description: 'Type a question about a student\'s academic progress. The system retrieves relevant context from the student\'s records.',
+    title: 'Ask About Any Student in Your Care',
+    description: 'Type a natural language question about a student\'s academic progress, strengths, or areas for growth. Teachers see their own class roster. Guidance counsellors see their full caseload. Parents see their own children. You never have to worry about accessing the wrong student -- the system enforces your scope automatically.',
     icon: 'message-circle',
   },
   {
-    title: 'Context Retrieval',
-    description: 'Your query is embedded and matched against the student\'s vectorized academic records using RAG (Retrieval-Augmented Generation).',
+    title: 'Real Data, Not Guesswork',
+    description: 'Behind the scenes, your question is matched against the student\'s actual academic records -- Google Classroom assignments, SIS report cards, transcripts, attendance, IEPs, and EQAO results. The AI sees what you would see if you pulled the student\'s OSR and reviewed every document.',
     icon: 'search',
   },
   {
-    title: 'Permission & Consent',
-    description: 'The system verifies your role permissions and checks parental consent before including any student data.',
+    title: 'Privacy Protected at Every Step',
+    description: 'Before any student data is included, the system verifies your role-based permissions and confirms that the student\'s parent has granted consent for AI-assisted context retrieval. Sensitive records like IEPs are only visible to authorized roles. No data is stored by the AI provider.',
     icon: 'shield',
   },
   {
-    title: 'AI Response',
-    description: 'The LLM generates a personalized, context-aware response using only the data you\'re authorized to see.',
+    title: 'Personalized, Grounded Responses',
+    description: 'The AI generates a response that references the student\'s actual performance -- not generic advice. A student asking "How am I doing in math?" gets an answer based on their real grades and teacher feedback. A teacher generating a report card comment gets a draft grounded in the full semester\'s data.',
     icon: 'sparkles',
   },
   {
-    title: 'Audit Trail',
-    description: 'Every context retrieval is logged for FIPPA compliance. Admins can review the full audit trail.',
+    title: 'Save Hours on Report Cards',
+    description: 'The Staff Portal generates Ontario Growing Success-aligned report card comments in seconds, complete with learning skills assessments. Review, adjust tone, and finalize -- what used to take 15-20 minutes per student now takes under a minute.',
+    icon: 'file-text',
+  },
+  {
+    title: 'Complete Audit Trail for Compliance',
+    description: 'Every context retrieval, every chat interaction, and every document access is logged with timestamps, actor identity, and target student. Board administrators can review the full audit trail for FIPPA compliance at any time. Your professional accountability is documented automatically.',
     icon: 'clipboard-list',
   },
 ];
 
 export const ROADMAP = [
   {
+    category: 'Recently Completed (v1.0.0)',
+    items: [
+      { label: 'SSO integration: Clerk live, Entra ID and Google stubs ready', priority: 'high' },
+      { label: 'API Key Broker with per-board billing limits and cost tracking', priority: 'high' },
+      { label: 'OneRoster 1.1 SIS provider for vendor-agnostic integration', priority: 'high' },
+      { label: 'MCP HTTP/SSE transport for embeddable context engine', priority: 'high' },
+      { label: 'OpenAI-compatible API for Open WebUI and third-party chat UIs', priority: 'high' },
+      { label: 'Rate limiting, E2E tests, and production Docker deployment', priority: 'high' },
+    ],
+  },
+  {
     category: 'In Progress',
     items: [
-      { label: 'SSO integration (Clerk, Entra ID, Google)', priority: 'high' },
-      { label: 'Real Aspen SIS API connection', priority: 'high' },
+      { label: 'TVDSB pilot deployment with live Aspen SIS connection', priority: 'high' },
+      { label: 'Complete Entra ID and Google Identity provider implementations', priority: 'high' },
+      { label: 'FIPPA/PHIPA compliance documentation package for board legal teams', priority: 'high' },
+      { label: 'Batch report card comment generation (full class in one click)', priority: 'medium' },
     ],
   },
   {
     category: 'Planned',
     items: [
-      { label: 'Per-board LLM provider configuration', priority: 'high' },
-      { label: 'FIPPA compliance documentation', priority: 'high' },
-      { label: 'Student portfolio view', priority: 'medium' },
-      { label: 'Batch report card comment generation', priority: 'medium' },
-      { label: 'Multi-language support (French)', priority: 'medium' },
+      { label: 'Student academic portfolio view with progress visualization', priority: 'medium' },
+      { label: 'Multi-language support (French) for Franco-Ontarian boards', priority: 'medium' },
+      { label: 'IEP-aware accommodations suggestions in chat responses', priority: 'medium' },
+      { label: 'Parent notification system for consent requests via email', priority: 'medium' },
+      { label: 'Board-level analytics dashboard for superintendents', priority: 'medium' },
     ],
   },
   {
     category: 'Future',
     items: [
-      { label: 'Parent mobile app', priority: 'low' },
-      { label: 'Google Forms assessment integration', priority: 'low' },
-      { label: 'Predictive analytics dashboard', priority: 'low' },
+      { label: 'Parent mobile app (iOS/Android) for consent and progress', priority: 'low' },
+      { label: 'Predictive early warning system for at-risk students', priority: 'low' },
+      { label: 'Google Forms and Brightspace assessment integration', priority: 'low' },
+      { label: 'Ministry of Education OnSIS reporting alignment', priority: 'low' },
     ],
   },
 ];
