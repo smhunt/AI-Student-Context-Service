@@ -2,7 +2,10 @@
 -- Boards never need their own LLM keys. EcoWorks holds master keys,
 -- proxies requests, marks up costs, and enforces limits.
 
-CREATE TYPE billing_plan AS ENUM ('pilot', 'standard', 'enterprise');
+DO $$ BEGIN
+  CREATE TYPE billing_plan AS ENUM ('pilot', 'standard', 'enterprise');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE board_llm_config (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

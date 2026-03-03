@@ -8,7 +8,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "db:migrate": "tsx src/db/migrate.ts",
-    "db:seed": "tsx src/db/seed.ts",
+    "db:seed": "tsx src/db/seed.ts && python3 src/db/gen-seed-sql.py && psql ${DATABASE_URL:-postgresql://sc_dev:dev_password@localhost:5438/studentcontext} -v ON_ERROR_STOP=1 -f /tmp/seed-docs.sql",
     "db:reset": "tsx src/db/reset.ts",
     "seed:large": "tsx src/db/seed-large.ts",
     "mcp": "tsx src/mcp/index.ts",

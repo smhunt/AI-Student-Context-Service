@@ -14,7 +14,7 @@ async function reset(): Promise<void> {
   `);
 
   // Drop custom types
-  const types = ['user_role', 'document_source', 'sensitivity_level', 'consent_status'];
+  const types = ['user_role', 'document_source', 'sensitivity_level', 'consent_status', 'billing_plan'];
   for (const t of types) {
     await pool.query(`DROP TYPE IF EXISTS ${t} CASCADE`);
   }
