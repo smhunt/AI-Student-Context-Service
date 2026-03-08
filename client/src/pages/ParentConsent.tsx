@@ -65,10 +65,11 @@ export default function ParentConsent() {
     } else {
       consent.setSelectedChildId(childId);
       setShowRevokeConfirm(null);
-      // Pre-fill sources if consent already granted
+      // Pre-fill sources if consent already granted (filter to only parent-selectable sources)
       const child = consent.children.find(c => c.id === childId);
+      const validKeys = DATA_SOURCES.map(s => s.key);
       if (child?.consent?.status === 'granted' && child.consent.data_sources) {
-        setSelectedSources([...child.consent.data_sources]);
+        setSelectedSources(child.consent.data_sources.filter(s => validKeys.includes(s)));
       } else {
         setSelectedSources([]);
       }
