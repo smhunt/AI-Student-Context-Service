@@ -176,17 +176,17 @@ COURSES_BY_GRADE = {
 # ─── Teacher data ────────────────────────────────────────────────────────────
 
 TEACHER_DEFS = [
-    # (first, last, department, ext_id_suffix)
-    ('Margaret', "O'Brien", 'English', '050'),
-    ('Robert', 'Patel', 'Science', '051'),
-    ('Jean-Pierre', 'Bouchard', 'History', '052'),
-    ('Catherine', 'Tremblay', 'French', '053'),
-    ('Michael', 'Wong', 'Mathematics', '054'),
-    ('Jennifer', 'MacDonald', 'Physical Education', '055'),
-    ('Pradeep', 'Sharma', 'Science', '056'),
-    ('Laura', 'Mitchell', 'English', '057'),
-    ('Kevin', 'Okafor', 'Mathematics', '058'),
-    ('Diane', 'Leclerc', 'Guidance', '059'),
+    # (first, last, department, ext_id_suffix, role_override)
+    ('Margaret', "O'Brien", 'English', '050', None),
+    ('Robert', 'Patel', 'Science', '051', None),
+    ('Jean-Pierre', 'Bouchard', 'History', '052', None),
+    ('Catherine', 'Tremblay', 'French', '053', None),
+    ('Michael', 'Wong', 'Mathematics', '054', None),
+    ('Jennifer', 'MacDonald', 'Physical Education', '055', None),
+    ('Pradeep', 'Sharma', 'Science', '056', None),
+    ('Laura', 'Mitchell', 'English', '057', None),
+    ('Kevin', 'Okafor', 'Mathematics', '058', None),
+    ('Diane', 'Leclerc', 'Guidance', '059', 'guidance_counsellor'),
 ]
 
 # Map subjects to teacher last names for report card attribution
@@ -1104,24 +1104,26 @@ def main():
         out.write("  RAISE NOTICE 'Cleanup complete.';\n\n")
 
         # Insert staff (10 teachers)
-        out.write("  -- ═══ Staff (10 additional teachers) ═══\n")
+        out.write("  -- ═══ Staff (10 additional teachers/counsellors) ═══\n")
         for t in TEACHER_DEFS:
-            first, last, dept, ext_suffix = t
+            first, last, dept, ext_suffix, role_override = t
+            user_role = role_override or 'teacher'
+            role_scope = 'guidance' if user_role == 'guidance_counsellor' else 'teacher'
             ext_id = f'STAFF-{ext_suffix}'
             email = f'{clean_name(first)}.{clean_name(last)}@tvdsb.on.ca'
             meta = json.dumps({'generated_50': True, 'department': dept})
             out.write(f"  INSERT INTO users (board_id, email, password_hash, name_first, name_last, role, external_id, metadata)\n")
-            out.write(f"  VALUES (v_board_id, '{esc(email)}', v_pw_hash, '{esc(first)}', '{esc(last)}', 'teacher', '{esc(ext_id)}', '{esc(meta)}')\n")
+            out.write(f"  VALUES (v_board_id, '{esc(email)}', v_pw_hash, '{esc(first)}', '{esc(last)}', '{user_role}', '{esc(ext_id)}', '{esc(meta)}')\n")
             out.write(f"  ON CONFLICT (board_id, external_id) DO UPDATE SET\n")
             out.write(f"    email = EXCLUDED.email, name_first = EXCLUDED.name_first, name_last = EXCLUDED.name_last,\n")
-            out.write(f"    metadata = EXCLUDED.metadata\n")
+            out.write(f"    role = EXCLUDED.role, metadata = EXCLUDED.metadata\n")
             out.write(f"  RETURNING id INTO v_staff_id;\n")
             # Assign to both schools
             out.write(f"  INSERT INTO staff_assignments (staff_id, school_id, academic_year, department, role_scope)\n")
-            out.write(f"  VALUES (v_staff_id, v_mhs_id, '2025-2026', '{esc(dept)}', 'teacher')\n")
+            out.write(f"  VALUES (v_staff_id, v_mhs_id, '2025-2026', '{esc(dept)}', '{role_scope}')\n")
             out.write(f"  ON CONFLICT DO NOTHING;\n")
             out.write(f"  INSERT INTO staff_assignments (staff_id, school_id, academic_year, department, role_scope)\n")
-            out.write(f"  VALUES (v_staff_id, v_ceci_id, '2025-2026', '{esc(dept)}', 'teacher')\n")
+            out.write(f"  VALUES (v_staff_id, v_ceci_id, '2025-2026', '{esc(dept)}', '{role_scope}')\n")
             out.write(f"  ON CONFLICT DO NOTHING;\n\n")
 
         # Insert courses (ON CONFLICT DO NOTHING)

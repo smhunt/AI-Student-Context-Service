@@ -10,11 +10,13 @@ const ClerkSignIn = isClerkAuth
   : null;
 
 const DEMO_USERS = [
-  { email: 'alex.johnson@tvdsb.on.ca', label: 'Alex Johnson', role: 'Student' },
-  { email: 'sarah.chen@tvdsb.on.ca', label: 'Sarah Chen', role: 'Teacher' },
-  { email: 'david.williams@tvdsb.on.ca', label: 'David Williams', role: 'Guidance' },
+  { email: 'emma.pelletier57@student.tvdsb.on.ca', label: 'Emma Pelletier', role: 'Student (G10)' },
+  { email: 'leila.campbell53@student.tvdsb.on.ca', label: 'Leila Campbell', role: 'Student (G9)' },
+  { email: 'robert.patel@tvdsb.on.ca', label: 'Robert Patel', role: 'Teacher (Science)' },
+  { email: 'kevin.okafor@tvdsb.on.ca', label: 'Kevin Okafor', role: 'Teacher (Math)' },
+  { email: 'diane.leclerc@tvdsb.on.ca', label: 'Diane Leclerc', role: 'Guidance' },
+  { email: 'sanjay.bhatia53@tvdsb.on.ca', label: 'Sanjay Bhatia', role: 'Parent (2 kids)' },
   { email: 'lisa.park@tvdsb.on.ca', label: 'Lisa Park', role: 'Principal' },
-  { email: 'maria.johnson@tvdsb.on.ca', label: 'Maria Johnson', role: 'Parent' },
   { email: 'james.wilson@tvdsb.on.ca', label: 'James Wilson', role: 'Board Admin' },
 ];
 
